@@ -6,14 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class FlyingLocation extends Model
 {
-    protected $fillable = [
-        'name',
-        'slug',
-        'region',
-        'latitude',
-        'longitude',
-        'description',
-        'is_enabled',
+protected $fillable = [
+        'type', 'name', 'slug', 'takeoff_kato', 'takeoff_nazim', 
+        'landing_kato', 'landing_nazim', 'boundaries_kato', 
+        'boundaries_nazim', 'max_altitude', 'map_image', 'is_enabled'
+    ];
+
+    // هذا الجزء هو الحل للمشكلة
+    protected $casts = [
+        'boundaries_kato' => 'array',
+        'boundaries_nazim' => 'array',
     ];
     // app/Models/FlyingLocation.php
 protected $appends = ['status_label'];

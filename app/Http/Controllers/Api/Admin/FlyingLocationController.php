@@ -26,13 +26,14 @@ class FlyingLocationController extends Controller
                   ->where('expires_at', '>', now());
             }]);
 
-        // Search filter
+        // Updated Search: Includes technical Kato/Nazim coordinates
         if ($request->has('search') && $request->search) {
             $search = $request->search;
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('region', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                  ->orWhere('type', 'like', "%{$search}%")
+                  ->orWhere('takeoff_kato', 'like', "%{$search}%")
+                  ->orWhere('takeoff_nazim', 'like', "%{$search}%");
             });
         }
 
@@ -43,15 +44,10 @@ class FlyingLocationController extends Controller
                 $q->where('status', $status)
                   ->whereIn('id', function($subquery) {
                       $subquery->select(DB::raw('MAX(id)'))
-                              ->from('clearance_statuses')
-                              ->groupBy('flying_location_id');
+                               ->from('clearance_statuses')
+                               ->groupBy('flying_location_id');
                   });
             });
-        }
-
-        // Region filter
-        if ($request->has('region') && $request->region) {
-            $query->where('region', $request->region);
         }
 
         // Enabled filter
@@ -59,7 +55,6 @@ class FlyingLocationController extends Controller
             $query->where('is_enabled', filter_var($request->enabled, FILTER_VALIDATE_BOOLEAN));
         }
 
-        // Pagination
         $perPage = $request->per_page ?? 20;
         $locations = $query->orderBy('name')->paginate($perPage);
 
@@ -70,14 +65,19 @@ class FlyingLocationController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'region' => 'nullable|string|max:100',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+            'type' => 'required|string',
+            'takeoff_kato' => 'required|string',
+            'takeoff_nazim' => 'required|string',
+            'landing_kato' => 'nullable|string',
+            'landing_nazim' => 'nullable|string',
+            'boundaries_kato' => 'nullable|array',
+            'boundaries_nazim' => 'nullable|array',
+            'max_altitude' => 'nullable|string',
             'description' => 'nullable|string',
             'sports' => 'nullable|array',
             'sports.*' => 'exists:sports,id',
             'is_enabled' => 'boolean',
-            'clearance_status' => 'nullable|in:green,red',
+            'clearance_status' => 'required|in:green,red',
             'clearance_reason' => 'nullable|string|max:500'
         ]);
 
@@ -97,19 +97,16 @@ class FlyingLocationController extends Controller
         try {
             $location = FlyingLocation::create($data);
 
-            // Attach sports
             if (isset($data['sports']) && is_array($data['sports'])) {
                 $location->sports()->sync($data['sports']);
             }
 
-            // Create initial clearance status if provided
-            if (isset($data['clearance_status'])) {
-                $location->clearanceStatuses()->create([
-                    'status' => $data['clearance_status'],
-                    'reason' => $data['clearance_reason'] ?? null,
-                    'updated_by' => auth()->id()
-                ]);
-            }
+            // Create initial clearance status
+            $location->clearanceStatuses()->create([
+                'status' => $data['clearance_status'],
+                'reason' => $data['clearance_reason'] ?? null,
+                'updated_by' => auth()->id()
+            ]);
 
             DB::commit();
             
@@ -149,9 +146,14 @@ class FlyingLocationController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:255',
-            'region' => 'nullable|string|max:100',
-            'latitude' => 'nullable|numeric|between:-90,90',
-            'longitude' => 'nullable|numeric|between:-180,180',
+            'type' => 'sometimes|string',
+            'takeoff_kato' => 'sometimes|string',
+            'takeoff_nazim' => 'sometimes|string',
+            'landing_kato' => 'nullable|string',
+            'landing_nazim' => 'nullable|string',
+            'boundaries_kato' => 'nullable|array',
+            'boundaries_nazim' => 'nullable|array',
+            'max_altitude' => 'nullable|string',
             'description' => 'nullable|string',
             'sports' => 'nullable|array',
             'sports.*' => 'exists:sports,id',
@@ -178,12 +180,10 @@ class FlyingLocationController extends Controller
         try {
             $flyingLocation->update($data);
 
-            // Update sports
             if (isset($data['sports'])) {
                 $flyingLocation->sports()->sync($data['sports']);
             }
 
-            // Update clearance status if changed
             if (isset($data['clearance_status'])) {
                 $latestStatus = $flyingLocation->clearanceStatuses()->latest()->first();
                 
@@ -222,7 +222,6 @@ class FlyingLocationController extends Controller
     {
         DB::beginTransaction();
         try {
-            // Delete related records
             $flyingLocation->clearanceStatuses()->delete();
             $flyingLocation->airspaceSessions()->delete();
             
@@ -250,29 +249,22 @@ class FlyingLocationController extends Controller
         }
     }
 
-    /**
-     * Get distinct regions from flying locations
-     */
     public function regions()
     {
-        $regions = FlyingLocation::distinct()
-            ->whereNotNull('region')
-            ->where('region', '!=', '')
-            ->orderBy('region')
-            ->pluck('region');
+        // Brief update: Excel has no regions, so we use Type or unique Name fragments
+        $types = FlyingLocation::distinct()
+            ->whereNotNull('type')
+            ->orderBy('type')
+            ->pluck('type');
 
         return response()->json([
             'success' => true,
-            'data' => $regions
+            'data' => $types
         ]);
     }
 
-    /**
-     * Generate QR code for a flying location
-     */
     public function generateQR(FlyingLocation $flyingLocation)
     {
-        // Check if QR code already exists
         if ($flyingLocation->qrCode) {
             return response()->json([
                 'success' => true,
@@ -283,10 +275,8 @@ class FlyingLocationController extends Controller
 
         DB::beginTransaction();
         try {
-            // Generate unique token
             $token = Uuid::uuid4()->toString();
             
-            // Create QR code record
             $qrCode = QRCode::create([
                 'flying_location_id' => $flyingLocation->id,
                 'token' => $token
@@ -310,9 +300,6 @@ class FlyingLocationController extends Controller
         }
     }
 
-    /**
-     * Get QR codes for a location
-     */
     public function getQRCodes(FlyingLocation $flyingLocation)
     {
         $qrCodes = $flyingLocation->qrCode()->get();
@@ -323,16 +310,12 @@ class FlyingLocationController extends Controller
         ]);
     }
 
-    /**
-     * Get location statistics
-     */
     public function statistics()
     {
         $totalLocations = FlyingLocation::count();
         $enabledLocations = FlyingLocation::where('is_enabled', true)->count();
         $locationsWithQR = FlyingLocation::has('qrCode')->count();
         
-        // Get status distribution
         $statusDistribution = DB::table('clearance_statuses')
             ->select('status', DB::raw('COUNT(DISTINCT flying_location_id) as count'))
             ->whereIn('id', function($query) {

@@ -13,12 +13,21 @@ return new class extends Migration
     {
         Schema::create('flying_locations', function (Blueprint $table) {
             $table->id();
-                $table->string('name');
+   $table->string('type');              // From Excel: نوع الطيران
+    $table->string('name');              // From Excel: مناطق التدريب
     $table->string('slug')->unique();
-    $table->string('region');
-    $table->decimal('latitude', 10, 7);
-    $table->decimal('longitude', 10, 7);
-    $table->text('description')->nullable();
+// تعديل أسماء الحقول لتطابق بيانات الإكسل والـ Seeder
+        $table->string('takeoff_kato')->nullable();
+        $table->string('takeoff_nazim')->nullable();
+        $table->string('landing_kato')->nullable();
+        $table->string('landing_nazim')->nullable();
+        
+        // إحداثيات الحدود (1, 2, 3, 4)
+        $table->json('boundaries_kato')->nullable();
+        $table->json('boundaries_nazim')->nullable();
+        
+        $table->string('max_altitude');      // الإرتفاع الأقصى
+        $table->string('map_image')->nullable();
     $table->boolean('is_enabled')->default(true);
             $table->timestamps();
         });
