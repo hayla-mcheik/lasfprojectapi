@@ -55,7 +55,7 @@ use App\Http\Controllers\PilotTeamController;
 |--------------------------------------------------------------------------
 */
 
-Route::post('/login', [AuthController::class, 'login']);
+Route::post('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/register', [AuthController::class, 'register']);
 
 Route::get('/flying-locations', [FlyingLocationController::class, 'index']);
