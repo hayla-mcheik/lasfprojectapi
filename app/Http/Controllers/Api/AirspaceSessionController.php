@@ -27,10 +27,18 @@ public function store(Request $request)
         'token' => 'required|exists:q_r_codes,token',
     ]);
 
+    // 1. Ensure user has a pilot profile
+    if (!$request->user()->pilotProfile) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Your account is not registered as a Pilot.'
+        ], 403);
+    }
+
     $qr = QRCode::with('location')->where('token', $request->token)->firstOrFail();
     $location = $qr->location;
 
-    // Check if pilot is already flying ANYWHERE
+    // 2. Prevent double check-in
     $activeElsewhere = AirspaceSession::where('pilot_id', $request->user()->id)
         ->where('status', 'active')
         ->whereNull('checked_out_at')
@@ -44,6 +52,7 @@ public function store(Request $request)
         ], 403);
     }
 
+    // 3. Create Session
     $session = AirspaceSession::create([
         'flying_location_id' => $location->id,
         'pilot_id' => $request->user()->id,
@@ -51,9 +60,9 @@ public function store(Request $request)
         'expires_at' => now()->addHours(2),
         'status' => 'active',
     ]);
-    return response()->json($session);
-}
 
+    return response()->json($session->load('pilot.pilotProfile', 'location'));
+}
 // App\Http\Controllers\Api\AirspaceSessionController.php
 
 // app/Http/Controllers/Api/AirspaceSessionController.php
