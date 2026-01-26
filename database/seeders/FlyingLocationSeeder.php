@@ -9,9 +9,13 @@ use Illuminate\Support\Facades\DB;
 
 class FlyingLocationSeeder extends Seeder
 {
+    /**
+     * Run the database seeds.
+     */
     public function run(): void
     {
-        // We no longer truncate the table so that existing records are preserved.
+        // NOTE: Truncate has been removed to preserve existing database records.
+        // This seeder will now update existing records based on the slug or create new ones.
 
         $locations = [
             [
@@ -186,13 +190,13 @@ class FlyingLocationSeeder extends Seeder
             // Generate slug based on the name
             $slug = Str::slug($data['name']);
             
-            // Use updateOrCreate to find by slug and update everything else
+            // updateOrCreate checks the slug. If found, it updates; if not, it creates.
             $location = FlyingLocation::updateOrCreate(
                 ['slug' => $slug],
                 $data
             );
 
-            // Add Default Status only if it doesn't already exist for this location
+            // Add Default Status ONLY if the location doesn't have one yet.
             if ($location->clearanceStatuses()->count() === 0) {
                 $location->clearanceStatuses()->create([
                     'status' => 'green',
