@@ -63,10 +63,19 @@ public function store(Request $request)
 
     return response()->json($session->load('pilot.pilotProfile', 'location'));
 }
-// App\Http\Controllers\Api\AirspaceSessionController.php
 
-// app/Http/Controllers/Api/AirspaceSessionController.php
 
+public function userActiveSession(Request $request)
+{
+    $session = AirspaceSession::with('location')
+        ->where('pilot_id', $request->user()->id)
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+        ->first();
+
+    return response()->json($session);
+}
 public function active(Request $request)
 {
     $locationId = $request->query('location_id');
