@@ -11,10 +11,7 @@ class FlyingLocationSeeder extends Seeder
 {
     public function run(): void
     {
-        // Clear only the flying locations data
-        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
-        FlyingLocation::truncate(); 
-        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        // We no longer truncate the table so that existing records are preserved.
 
         $locations = [
             [
@@ -22,7 +19,6 @@ class FlyingLocationSeeder extends Seeder
                 'name' => 'غابة الأرز (1)',
                 'takeoff_kato' => '183076', 'takeoff_nazim' => '254568',
                 'landing_kato' => '183115', 'landing_nazim' => '251143',
-                // Spaced from Cedars 2
                 'boundaries_kato' => [['lat' => 34.26, 'lng' => 36.06], '181126', '184212', '186331', '182168'],
                 'boundaries_nazim' => ['253511', '256768', '248086', '246906'],
                 'max_altitude' => '1000قدم وما دون فوق سطح الأرض',
@@ -131,7 +127,6 @@ class FlyingLocationSeeder extends Seeder
                 'name' => 'فالوغا',
                 'takeoff_kato' => '151983', 'takeoff_nazim' => '208897',
                 'landing_kato' => '153400', 'landing_nazim' => '212404',
-                // Spaced from Hammana
                 'boundaries_kato' => [['lat' => 33.86, 'lng' => 35.78], '151282', '154316', '154563', '151345'],
                 'boundaries_nazim' => ['208556', '208509', '212898', '212498'],
                 'max_altitude' => 'مماثل لغابة الأرز',
@@ -188,15 +183,23 @@ class FlyingLocationSeeder extends Seeder
         ];
 
         foreach ($locations as $data) {
-            $data['slug'] = Str::slug($data['name']);
-            $location = FlyingLocation::create($data);
+            // Generate slug based on the name
+            $slug = Str::slug($data['name']);
+            
+            // Use updateOrCreate to find by slug and update everything else
+            $location = FlyingLocation::updateOrCreate(
+                ['slug' => $slug],
+                $data
+            );
 
-            // Add Default Status
-            $location->clearanceStatuses()->create([
-                'status' => 'green',
-                'reason' => 'مفتوح للطيران الجوي الروتيني',
-                'updated_by' => 1
-            ]);
+            // Add Default Status only if it doesn't already exist for this location
+            if ($location->clearanceStatuses()->count() === 0) {
+                $location->clearanceStatuses()->create([
+                    'status' => 'green',
+                    'reason' => 'مفتوح للطيران الجوي الروتيني',
+                    'updated_by' => 1
+                ]);
+            }
         }
     }
 }
