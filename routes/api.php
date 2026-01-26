@@ -83,10 +83,8 @@ Route::get('/events/{slug}', [EventController::class, 'show']);
 Route::get('/testimonials', [TestimonialController::class, 'index']);
 // Put this near your other airspace session routes
 Route::get('/airspace-sessions/active', [AirspaceSessionController::class, 'active']);
-// Correct Order in api.php
-Route::get('/airspace-sessions/active', [AirspaceSessionController::class, 'active']); 
 Route::get('/flying-locations/{slug}', [FlyingLocationController::class, 'show']);
-
+Route::get('/qr/{token}', [AirspaceSessionController::class, 'qr']);
 Route::get('/about-us', [PublicPageController::class, 'getAbout']);
 Route::get('/regulations', [PublicPageController::class, 'getRegulations']);
 /*

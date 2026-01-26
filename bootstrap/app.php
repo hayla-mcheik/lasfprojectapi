@@ -4,6 +4,10 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
+// ... imports
+use Illuminate\Http\Request;
+use Throwable;
+
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
@@ -13,18 +17,22 @@ return Application::configure(basePath: dirname(__DIR__))
         apiPrefix: ''
     )
     ->withMiddleware(function (Middleware $middleware) {
-
-        // ✅ Disable CSRF for API routes (Laravel 12 way)
         $middleware->validateCsrfTokens(except: [
             'api/*',
         ]);
 
-        // ✅ Middleware aliases
         $middleware->alias([
             'admin' => \App\Http\Middleware\AdminMiddleware::class,
         ]);
     })
-    ->withExceptions(function (Exceptions $exceptions): void {
-        //
+    ->withExceptions(function (Exceptions $exceptions) {
+        // ✅ Add this to force JSON responses for API routes
+        $exceptions->shouldRenderJsonWhen(function (Request $request, Throwable $e) {
+            if ($request->is('api/*')) {
+                return true;
+            }
+
+            return $request->expectsJson();
+        });
     })
     ->create();
