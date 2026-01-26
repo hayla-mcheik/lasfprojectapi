@@ -78,22 +78,8 @@ public function userActiveSession(Request $request)
 }
 public function active(Request $request)
 {
-    $locationId = $request->query('location_id');
-
-    // Validation to prevent empty queries
-    if (!$locationId) {
-        return response()->json([], 200);
-    }
-
-    $sessions = AirspaceSession::with(['pilot.pilotProfile', 'location'])
-        ->where('flying_location_id', $locationId)
-        ->where('status', 'active')
-        ->whereNull('checked_out_at')
-        ->where('expires_at', '>', now())
-        ->latest()
-        ->get();
-
-    return response()->json($sessions);
+    dd($request);
+  
 }
 public function checkout(Request $request, $id)
 {
