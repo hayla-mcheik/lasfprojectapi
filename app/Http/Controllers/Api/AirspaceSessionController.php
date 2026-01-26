@@ -12,12 +12,22 @@ use Illuminate\Support\Carbon;
 class AirspaceSessionController extends Controller
 {
     // QR scan → return location info
-    public function qr($token)
-    {
-        $qr = QRCode::with('location')->where('token', $token)->firstOrFail();
-        return response()->json($qr->location);
-    }
+public function qr($token)
+{
+    // Find the location associated with this secret token
+    $qrCode = QRCode::where('token', $token)->firstOrFail();
+    $location = FlyingLocation::with(['clearanceStatuses' => function($q) {
+        $q->latest()->limit(1);
+    }])->find($qrCode->flying_location_id);
 
+    return response()->json([
+        'id' => $location->id,
+        'name' => $location->name,
+        'slug' => $location->slug,
+        'status' => $location->clearanceStatuses->first()->status ?? 'red',
+        'region' => $location->type, // Using 'type' as region per your admin logic
+    ]);
+}
     // Pilot check-in
 // App\Http\Controllers\Api\AirspaceSessionController.php
 
