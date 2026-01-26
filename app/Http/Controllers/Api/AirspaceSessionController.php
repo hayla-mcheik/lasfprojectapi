@@ -12,22 +12,12 @@ use Illuminate\Support\Carbon;
 class AirspaceSessionController extends Controller
 {
     // QR scan → return location info
-public function qr($token)
-{
-    // Find the location associated with this secret token
-    $qrCode = QRCode::where('token', $token)->firstOrFail();
-    $location = FlyingLocation::with(['clearanceStatuses' => function($q) {
-        $q->latest()->limit(1);
-    }])->find($qrCode->flying_location_id);
+    public function qr($token)
+    {
+        $qr = QRCode::with('location')->where('token', $token)->firstOrFail();
+        return response()->json($qr->location);
+    }
 
-    return response()->json([
-        'id' => $location->id,
-        'name' => $location->name,
-        'slug' => $location->slug,
-        'status' => $location->clearanceStatuses->first()->status ?? 'red',
-        'region' => $location->type, // Using 'type' as region per your admin logic
-    ]);
-}
     // Pilot check-in
 // App\Http\Controllers\Api\AirspaceSessionController.php
 
@@ -98,19 +88,6 @@ public function checkout(Request $request, $id)
         'checked_out_at' => now(),
         'status' => 'closed', // Logic: 'active' means flying, 'closed' means landed
     ]);
-    return response()->json($session);
-}
-// app/Http/Controllers/Api/AirspaceSessionController.php
-
-public function userActiveSession(Request $request)
-{
-    $session = AirspaceSession::with('location')
-        ->where('pilot_id', $request->user()->id)
-        ->where('status', 'active')
-        ->whereNull('checked_out_at')
-        ->where('expires_at', '>', now())
-        ->first();
-
     return response()->json($session);
 }
 }
