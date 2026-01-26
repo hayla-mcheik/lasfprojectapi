@@ -98,6 +98,7 @@ Route::get('/regulations', [PublicPageController::class, 'getRegulations']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::get('/airspace-sessions/active-pilot', [AirspaceSessionController::class, 'userActiveSession']);
     Route::post('/airspace-sessions', [AirspaceSessionController::class, 'store']);
     Route::post('/airspace-sessions/{id}/checkout', [AirspaceSessionController::class, 'checkout']);
 });

@@ -90,4 +90,17 @@ public function checkout(Request $request, $id)
     ]);
     return response()->json($session);
 }
+// app/Http/Controllers/Api/AirspaceSessionController.php
+
+public function userActiveSession(Request $request)
+{
+    $session = AirspaceSession::with('location')
+        ->where('pilot_id', $request->user()->id)
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+        ->first();
+
+    return response()->json($session);
+}
 }
