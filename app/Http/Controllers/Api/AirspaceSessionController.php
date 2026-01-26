@@ -78,14 +78,13 @@ public function userActiveSession(Request $request)
 }
 public function active(Request $request)
 {
-    // Ensure you return JSON, not dd()
+    // Remove dd($request);
     $locationId = $request->query('location_id');
-    
-    $sessions = AirspaceSession::with('pilot.pilotProfile')
+
+    $sessions = AirspaceSession::with('pilot')
         ->where('flying_location_id', $locationId)
         ->where('status', 'active')
         ->whereNull('checked_out_at')
-        ->where('expires_at', '>', now())
         ->get();
 
     return response()->json($sessions);
