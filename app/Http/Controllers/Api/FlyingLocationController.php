@@ -21,7 +21,7 @@ class FlyingLocationController extends Controller
             }])
             ->get();
 
-        return response()->json($locations);
+   return response()->json(['data' => $locations]);
     }
 
     public function show($slug)

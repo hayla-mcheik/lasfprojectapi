@@ -17,15 +17,34 @@ protected $fillable = [
         'boundaries_kato' => 'array',
         'boundaries_nazim' => 'array',
     ];
-    // app/Models/FlyingLocation.php
-protected $appends = ['status_label'];
 
-public function getStatusLabelAttribute()
+protected $appends = ['status_label', 'latitude', 'longitude'];
+
+    public function getStatusLabelAttribute()
+    {
+        $lastStatus = $this->clearanceStatuses()->latest()->first();
+        return $lastStatus ? $lastStatus->status : 'green';
+    }
+
+public function getLatitudeAttribute()
 {
-    $lastStatus = $this->clearanceStatuses()->latest()->first();
-    return $lastStatus ? $lastStatus->status : 'green';
+    $bounds = $this->boundaries_kato;
+    if (is_array($bounds) && isset($bounds[0]['lat'])) {
+        return (float) $bounds[0]['lat'];
+    }
+    // TEMPORARY TEST: This will spread them out so you can see they are working
+    return 33.5 + ($this->id * 0.05); 
 }
 
+public function getLongitudeAttribute()
+{
+    $bounds = $this->boundaries_kato;
+    if (is_array($bounds) && isset($bounds[0]['lng'])) {
+        return (float) $bounds[0]['lng'];
+    }
+    // TEMPORARY TEST: This will spread them out
+    return 35.2 + ($this->id * 0.05);
+}
     public function sports()
     {
         return $this->belongsToMany(Sport::class, 'flying_location_sport');
