@@ -24,24 +24,22 @@ class FlyingLocationController extends Controller
    return response()->json(['data' => $locations]);
     }
 
-    public function show($slug)
-    {
-        // Eager load everything needed for the dashboard
-        $location = FlyingLocation::with([
-            'sports', 
-            'clearanceStatuses', 
-            'qrCode', 
-            'airspaceSessions' => function($q) {
-                $q->where('status', 'active')
-                  ->whereNull('checked_out_at')
+public function show($slug)
+{
+    $location = FlyingLocation::with([
+        'sports',
+        'clearanceStatuses' => fn($q) => $q->latest(),
+        'qrCode',
+        // Load active sessions with pilot details for the "Live Airspace" sidebar
+        'airspaceSessions' => function($query) {
+            $query->where('status', 'active')
                   ->where('expires_at', '>', now())
-                  ->with('pilot.pilotProfile'); // Load pilot names and license
-            }
-        ])
-        ->where('slug', $slug)
-        ->firstOrFail();
+                  ->with('pilot.pilotProfile'); 
+        }
+    ])
+    ->where('slug', $slug)
+    ->firstOrFail();
 
-        // Wrap in 'data' key to match what Nuxt expects
-        return response()->json(['data' => $location]);
-    }
+    return response()->json(['data' => $location]);
+}
 }

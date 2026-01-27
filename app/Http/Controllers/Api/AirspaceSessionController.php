@@ -34,43 +34,45 @@ class AirspaceSessionController extends Controller
      * Prevents non-pilots from checking in and prevents double sessions.
      */
     public function store(Request $request)
-    {
-        $request->validate(['token' => 'required|exists:q_r_codes,token']);
+{
+    $request->validate([
+        'token' => 'required|string',
+    ]);
 
-        // 1. Only Pilots can check in
-        if (!$request->user()->pilotProfile) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Your account is not registered as a Pilot profile.'
-            ], 403);
-        }
+    // 1. Find the QR code and its associated location
+    $qr = \App\Models\QRCode::where('token', $request->token)->first();
 
-        $qr = QRCode::with('location')->where('token', $request->token)->firstOrFail();
-
-        // 2. Prevent multiple active sessions
-        $activeElsewhere = AirspaceSession::where('pilot_id', $request->user()->id)
-            ->where('status', 'active')
-            ->whereNull('checked_out_at')
-            ->where('expires_at', '>', now())
-            ->exists();
-
-        if ($activeElsewhere) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'You are already checked in at another location.'
-            ], 403);
-        }
-
-        $session = AirspaceSession::create([
-            'flying_location_id' => $qr->location->id,
-            'pilot_id' => $request->user()->id,
-            'checked_in_at' => now(),
-            'expires_at' => now()->addHours(2),
-            'status' => 'active',
-        ]);
-
-        return response()->json($session->load('pilot.pilotProfile', 'location'));
+    if (!$qr) {
+        return response()->json(['message' => 'Invalid or expired QR code.'], 404);
     }
+
+    $pilot = $request->user();
+
+    // 2. Security: Ensure user is a Pilot
+    if (!$pilot->pilotProfile) {
+        return response()->json(['message' => 'Only licensed pilots can reserve airspace.'], 403);
+    }
+
+    // 3. Prevent double check-in
+    $active = AirspaceSession::where('pilot_id', $pilot->id)
+        ->where('status', 'active')
+        ->exists();
+
+    if ($active) {
+        return response()->json(['message' => 'You are already checked in at a location.'], 422);
+    }
+
+    // 4. Create Session
+    $session = AirspaceSession::create([
+        'flying_location_id' => $qr->flying_location_id,
+        'pilot_id' => $pilot->id,
+        'checked_in_at' => now(),
+        'expires_at' => now()->addHours(3), // Standard 3-hour window
+        'status' => 'active',
+    ]);
+
+    return response()->json($session->load('location'));
+}
 
     /**
      * PRIVATE: Get the specific user's current session if any.
