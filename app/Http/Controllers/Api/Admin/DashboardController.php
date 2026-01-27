@@ -93,72 +93,78 @@ class DashboardController extends Controller
         }
     }
     
+
     private function getLocationStatus()
-    {
-        // Get the latest clearance status for each location
-        $subquery = ClearanceStatus::select('flying_location_id', DB::raw('MAX(created_at) as latest_date'))
-            ->groupBy('flying_location_id');
+{
+    $subquery = ClearanceStatus::select('flying_location_id', DB::raw('MAX(created_at) as latest_date'))
+        ->groupBy('flying_location_id');
+    
+    $statuses = DB::table('clearance_statuses as cs1')
+        ->joinSub($subquery, 'latest', function($join) {
+            $join->on('cs1.flying_location_id', '=', 'latest.flying_location_id')
+                 ->on('cs1.created_at', '=', 'latest.latest_date');
+        })
+        ->join('flying_locations', 'cs1.flying_location_id', '=', 'flying_locations.id')
+        ->where('flying_locations.is_enabled', true)
+        ->select(
+            'flying_locations.id',
+            'flying_locations.name',
+            // REMOVED 'flying_locations.region'
+            'cs1.status',
+            'cs1.reason',
+            'cs1.created_at as updated_at'
+        )
+        ->get();
+    
+    $summary = [
+        'cleared' => 0, // Changed from green/red to match your Vue state cleared/restricted/closed
+        'restricted' => 0,
+        'closed' => 0,
+        'locations' => []
+    ];
+    
+    foreach ($statuses as $status) {
+        if ($status->status === 'green') $summary['cleared']++;
+        elseif ($status->status === 'yellow') $summary['restricted']++;
+        elseif ($status->status === 'red') $summary['closed']++;
         
-        $statuses = DB::table('clearance_statuses as cs1')
-            ->joinSub($subquery, 'latest', function($join) {
-                $join->on('cs1.flying_location_id', '=', 'latest.flying_location_id')
-                     ->on('cs1.created_at', '=', 'latest.latest_date');
-            })
-            ->join('flying_locations', 'cs1.flying_location_id', '=', 'flying_locations.id')
-            ->where('flying_locations.is_enabled', true)
-            ->select(
-                'flying_locations.id',
-                'flying_locations.name',
-                'flying_locations.region',
-                'cs1.status',
-                'cs1.reason',
-                'cs1.created_at as updated_at'
-            )
-            ->get();
-        
-        $summary = [
-            'green' => 0,
-            'red' => 0,
-            'locations' => []
+        $summary['locations'][] = [
+            'id' => $status->id,
+            'name' => $status->name,
+            'status' => $status->status === 'green' ? 'cleared' : ($status->status === 'red' ? 'closed' : 'restricted'),
+            'reason' => $status->reason,
+            'updated_at' => $status->updated_at,
         ];
-        
-        foreach ($statuses as $status) {
-            if ($status->status === 'green') {
-                $summary['green']++;
-            } elseif ($status->status === 'red') {
-                $summary['red']++;
-            }
-            
-            $summary['locations'][] = [
-                'id' => $status->id,
-                'name' => $status->name,
-                'region' => $status->region,
-                'status' => $status->status,
-                'reason' => $status->reason,
-                'updated_at' => $status->updated_at,
-            ];
-        }
-        
-        // Add locations without clearance status
-        $locationsWithoutStatus = FlyingLocation::where('is_enabled', true)
-            ->whereDoesntHave('clearanceStatuses')
-            ->get();
-        
-        foreach ($locationsWithoutStatus as $location) {
-            $summary['green']++; // Default to green
-            $summary['locations'][] = [
-                'id' => $location->id,
-                'name' => $location->name,
-                'region' => $location->region,
-                'status' => 'green',
-                'reason' => 'No clearance status set',
-                'updated_at' => $location->created_at,
-            ];
-        }
-        
-        return $summary;
     }
     
+    return $summary;
+}
+
+private function getRedStatusLocations()
+{
+    $subquery = ClearanceStatus::select('flying_location_id', DB::raw('MAX(created_at) as latest_date'))
+        ->groupBy('flying_location_id');
+
+    return DB::table('clearance_statuses as cs1')
+        ->joinSub($subquery, 'latest', function ($join) {
+            $join->on('cs1.flying_location_id', '=', 'latest.flying_location_id')
+                 ->on('cs1.created_at', '=', 'latest.latest_date');
+        })
+        ->join('flying_locations', 'cs1.flying_location_id', '=', 'flying_locations.id')
+        ->where('cs1.status', 'red')
+        ->where('flying_locations.is_enabled', true)
+        ->select(
+            'flying_locations.id',
+            'flying_locations.name',
+            // REMOVED 'flying_locations.region'
+            'cs1.reason',
+            'cs1.created_at as updated_at'
+        )
+        ->get()
+        ->map(fn($item) => (array) $item)
+        ->toArray();
+}
+
     private function getRecentActivities($limit = 8)
     {
         $activities = [];
@@ -279,32 +285,7 @@ class DashboardController extends Controller
         return array_slice($notices, 0, 5);
     }
     
-    private function getRedStatusLocations()
-    {
-        $subquery = ClearanceStatus::select('flying_location_id', DB::raw('MAX(created_at) as latest_date'))
-            ->groupBy('flying_location_id');
 
-        $locations = DB::table('clearance_statuses as cs1')
-            ->joinSub($subquery, 'latest', function ($join) {
-                $join->on('cs1.flying_location_id', '=', 'latest.flying_location_id')
-                     ->on('cs1.created_at', '=', 'latest.latest_date');
-            })
-            ->join('flying_locations', 'cs1.flying_location_id', '=', 'flying_locations.id')
-            ->where('cs1.status', 'red')
-            ->where('flying_locations.is_enabled', true)
-            ->select(
-                'flying_locations.id',
-                'flying_locations.name',
-                'cs1.reason',
-                'cs1.created_at as updated_at'
-            )
-            ->get();
-
-        // Convert all stdClass objects to arrays
-        return $locations->map(function($item) {
-            return (array) $item;
-        })->toArray();
-    }
 
     private function getDailyStats($days = 7)
     {
