@@ -9,31 +9,45 @@ use Illuminate\Http\Request;
 
 class AirspaceSessionController extends Controller
 {
-    // 1. Get location info from QR
-    public function qr($token)
+    /**
+     * PUBLIC: Get active pilots for a specific location.
+     * Nuxt uses this to show the "Live Airspace" sidebar.
+     */
+    public function active(Request $request)
     {
-        $qr = QRCode::with('location')->where('token', $token)->firstOrFail();
-        return response()->json($qr->location);
+        $locationId = $request->query('location_id');
+
+        if (!$locationId) return response()->json([]);
+
+        $sessions = AirspaceSession::with(['pilot.pilotProfile'])
+            ->where('flying_location_id', $locationId)
+            ->where('status', 'active')
+            ->whereNull('checked_out_at')
+            ->where('expires_at', '>', now())
+            ->get();
+
+        return response()->json($sessions);
     }
 
-    // 2. Pilot check-in (requires auth:sanctum middleware in routes)
+    /**
+     * PRIVATE: Pilot check-in.
+     * Prevents non-pilots from checking in and prevents double sessions.
+     */
     public function store(Request $request)
     {
-        $request->validate([
-            'token' => 'required|exists:q_r_codes,token',
-        ]);
+        $request->validate(['token' => 'required|exists:q_r_codes,token']);
 
-        // Ensure user has a pilot profile
+        // 1. Only Pilots can check in
         if (!$request->user()->pilotProfile) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is not registered as a Pilot.'
+                'message' => 'Your account is not registered as a Pilot profile.'
             ], 403);
         }
 
         $qr = QRCode::with('location')->where('token', $request->token)->firstOrFail();
-        
-        // Prevent double check-in
+
+        // 2. Prevent multiple active sessions
         $activeElsewhere = AirspaceSession::where('pilot_id', $request->user()->id)
             ->where('status', 'active')
             ->whereNull('checked_out_at')
@@ -55,29 +69,27 @@ class AirspaceSessionController extends Controller
             'status' => 'active',
         ]);
 
-        return response()->json($session->load('pilot', 'location'));
+        return response()->json($session->load('pilot.pilotProfile', 'location'));
     }
 
-    // 3. Public: Get active pilots for a location
-    public function active(Request $request)
+    /**
+     * PRIVATE: Get the specific user's current session if any.
+     */
+    public function userActiveSession(Request $request)
     {
-        $locationId = $request->query('location_id');
-
-        if (!$locationId) {
-            return response()->json([]);
-        }
-
-        $sessions = AirspaceSession::with('pilot')
-            ->where('flying_location_id', $locationId)
+        $session = AirspaceSession::with('location')
+            ->where('pilot_id', $request->user()->id)
             ->where('status', 'active')
             ->whereNull('checked_out_at')
             ->where('expires_at', '>', now())
-            ->get();
+            ->first();
 
-        return response()->json($sessions);
+        return response()->json($session);
     }
 
-    // 4. Pilot check-out
+    /**
+     * PRIVATE: Check-out (Landing).
+     */
     public function checkout(Request $request, $id)
     {
         $session = AirspaceSession::where('id', $id)
