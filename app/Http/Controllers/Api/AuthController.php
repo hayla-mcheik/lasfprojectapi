@@ -75,6 +75,39 @@ public function login(Request $request)
             'token' => $token,
         ]);
     }
+    public function updateProfile(Request $request)
+{
+    $user = $request->user();
+
+    $request->validate([
+        'name'  => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email,' . $user->id,
+        'current_password' => 'nullable|required_with:new_password',
+        'new_password'     => 'nullable|min:6|confirmed',
+    ]);
+
+    // Update basic info
+    $user->name = $request->name;
+    $user->email = $request->email;
+
+    // Handle password change if requested
+    if ($request->filled('new_password')) {
+        // Verify current password
+        if (!Hash::check($request->current_password, $user->password)) {
+            throw ValidationException::withMessages([
+                'current_password' => ['The provided password does not match your current password.'],
+            ]);
+        }
+        $user->password = Hash::make($request->new_password);
+    }
+
+    $user->save();
+
+    return response()->json([
+        'message' => 'Profile updated successfully',
+        'user' => $user
+    ]);
+}
 
     // Logout
     public function logout(Request $request)
