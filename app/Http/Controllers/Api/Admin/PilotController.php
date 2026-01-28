@@ -131,8 +131,7 @@ class PilotController extends Controller
 
     public function destroy(User $pilot)
     {
-        if ($pilot->is_admin) return response()->json(['success' => false], 403);
-        
+   
         if ($pilot->pilotProfile && $pilot->pilotProfile->image) {
             Storage::disk('public')->delete(str_replace('/storage/', '', $pilot->pilotProfile->image));
         }

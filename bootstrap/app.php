@@ -12,16 +12,16 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: ''
+        // apiPrefix: ''
     )
     ->withMiddleware(function (Middleware $middleware) {
-        $middleware->validateCsrfTokens(except: [
-            'api/*',
-        ]);
+        // $middleware->validateCsrfTokens(except: [
+        //     'api/*',
+        // ]);
 
-        $middleware->alias([
-            'admin' => \App\Http\Middleware\AdminMiddleware::class,
-        ]);
+        // $middleware->alias([
+        //     'admin' => \App\Http\Middleware\AdminMiddleware::class,
+        // ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
         // ✅ Add this to force JSON responses for API routes
