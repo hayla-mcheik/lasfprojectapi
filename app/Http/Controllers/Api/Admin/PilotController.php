@@ -129,18 +129,46 @@ class PilotController extends Controller
         }
     }
 
-    public function destroy(User $pilot)
-    {
-   
-        if ($pilot->pilotProfile && $pilot->pilotProfile->image) {
-            Storage::disk('public')->delete(str_replace('/storage/', '', $pilot->pilotProfile->image));
-        }
-        
-        $pilot->pilotProfile()->delete();
-        $pilot->delete();
-        return response()->json(['success' => true]);
+public function destroy(User $pilot)
+{
+    // 1. Safety check: Don't let an admin delete themselves or other admins via this route
+    if ($pilot->is_admin) {
+        return response()->json(['message' => 'Cannot delete an administrator'], 403);
     }
 
+    try {
+        // Use a transaction so if one part fails, nothing is deleted
+        return DB::transaction(function () use ($pilot) {
+            
+            // 2. Delete the Pilot Profile first (Line 140 likely fails because of this)
+            if ($pilot->pilotProfile) {
+                // Delete photo from storage if it exists
+                if ($pilot->pilotProfile->image) {
+                    $imagePath = str_replace('/storage/', '', $pilot->pilotProfile->image);
+                    Storage::disk('public')->delete($imagePath);
+                }
+                $pilot->pilotProfile->delete();
+            }
+
+            // 3. Delete related airspace sessions (if you don't mind losing flight history)
+            // If you want to keep history, you'd need to set pilot_id to null or use SoftDeletes
+            $pilot->airspaceSessions()->delete();
+
+            // 4. Now it is safe to delete the User
+            $pilot->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pilot and all related data deleted successfully'
+            ]);
+        });
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Delete failed: ' . $e->getMessage()
+        ], 500);
+    }
+}
 
     public function export(Request $request)
     {
