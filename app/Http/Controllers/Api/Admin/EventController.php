@@ -10,8 +10,22 @@ use Illuminate\Support\Str;
 
 class EventController extends Controller
 {
-    public function index() { return Event::latest()->get(); }
+public function index(Request $request) 
+{ 
+    $query = Event::query();
 
+    // Search filter
+    if ($request->filled('search')) {
+        $query->where('title', 'like', '%' . $request->search . '%');
+    }
+
+    // Status filter
+    if ($request->filled('status')) {
+        $query->where('status', $request->status);
+    }
+
+    return $query->latest()->get(); 
+}
     public function store(Request $r)
     {
         $data = $r->validate([
