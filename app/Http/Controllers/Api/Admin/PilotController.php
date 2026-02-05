@@ -43,7 +43,7 @@ class PilotController extends Controller
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
             'is_active' => 'boolean',
-      'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number',
+            'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number',
             'license_type' => 'required|string|max:50',
             'expiry_date' => 'nullable|date',
             'club_name' => 'nullable|string|max:100',
@@ -63,7 +63,7 @@ class PilotController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
-                'password' => bcrypt('password'),
+                'password' => bcrypt('password'), // Default password
                 'is_admin' => false,
                 'is_active' => $request->is_active ?? true,
             ]);
@@ -87,12 +87,13 @@ class PilotController extends Controller
 
     public function update(Request $request, User $pilot)
     {
+        // FIX: Added ignore rule for unique constraints to prevent 422 errors when saving unchanged data
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $pilot->id,
             'phone' => 'nullable|string|max:20',
             'is_active' => 'boolean',
-         'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number',
+            'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number,' . ($pilot->pilotProfile->id ?? 0),
             'license_type' => 'nullable|string|max:50',
             'club_name' => 'nullable|string|max:100',
             'facebook_url' => 'nullable|url',
@@ -107,13 +108,16 @@ class PilotController extends Controller
 
         DB::beginTransaction();
         try {
+            // Update User (Includes Phone)
             $pilot->update($request->only(['name', 'email', 'phone', 'is_active']));
 
             $profileData = $request->only(['license_number', 'license_type', 'club_name', 'expiry_date', 'facebook_url', 'instagram_url', 'designation']);
 
             if ($request->hasFile('image')) {
+                // Delete old image if it exists
                 if ($pilot->pilotProfile && $pilot->pilotProfile->image) {
-                    Storage::disk('public')->delete(str_replace('/storage/', '', $pilot->pilotProfile->image));
+                    $oldPath = str_replace('/storage/', '', $pilot->pilotProfile->image);
+                    Storage::disk('public')->delete($oldPath);
                 }
                 $path = $request->file('image')->store('pilots', 'public');
                 $profileData['image'] = Storage::url($path);
@@ -129,46 +133,37 @@ class PilotController extends Controller
         }
     }
 
-public function destroy(User $pilot)
-{
-    // 1. Safety check: Don't let an admin delete themselves or other admins via this route
-    if ($pilot->is_admin) {
-        return response()->json(['message' => 'Cannot delete an administrator'], 403);
-    }
+    public function destroy(User $pilot)
+    {
+        if ($pilot->is_admin) {
+            return response()->json(['success' => false, 'message' => 'Cannot delete an administrator'], 403);
+        }
 
-    try {
-        // Use a transaction so if one part fails, nothing is deleted
-        return DB::transaction(function () use ($pilot) {
-            
-            // 2. Delete the Pilot Profile first (Line 140 likely fails because of this)
+        DB::beginTransaction();
+        try {
             if ($pilot->pilotProfile) {
-                // Delete photo from storage if it exists
+                // Delete photo from storage
                 if ($pilot->pilotProfile->image) {
                     $imagePath = str_replace('/storage/', '', $pilot->pilotProfile->image);
                     Storage::disk('public')->delete($imagePath);
                 }
-                $pilot->pilotProfile->delete();
+                $pilot->pilotProfile()->delete();
             }
 
-            // 3. Delete related airspace sessions (if you don't mind losing flight history)
-            // If you want to keep history, you'd need to set pilot_id to null or use SoftDeletes
-            $pilot->airspaceSessions()->delete();
+            // Optional: Handle related airspace sessions if they exist
+            if (method_exists($pilot, 'airspaceSessions')) {
+                $pilot->airspaceSessions()->delete();
+            }
 
-            // 4. Now it is safe to delete the User
             $pilot->delete();
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Pilot and all related data deleted successfully'
-            ]);
-        });
-    } catch (\Exception $e) {
-        return response()->json([
-            'success' => false,
-            'message' => 'Delete failed: ' . $e->getMessage()
-        ], 500);
+            
+            DB::commit();
+            return response()->json(['success' => true, 'message' => 'Pilot deleted successfully']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+        }
     }
-}
 
     public function export(Request $request)
     {

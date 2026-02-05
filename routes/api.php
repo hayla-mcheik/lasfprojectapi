@@ -139,7 +139,7 @@ Route::post('/about-us', [PageContentController::class, 'updateAbout']);
         Route::apiResource('destinations', AdminDestinationController::class);
         Route::apiResource('events', AdminEventController::class);
         Route::apiResource('testimonials', AdminTestimonialController::class);
-        
+           
         // Gallery
         Route::apiResource('gallery', AdminGalleryController::class)
             ->only(['index', 'store', 'destroy']);
