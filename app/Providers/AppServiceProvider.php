@@ -3,7 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
-
+use Laravel\Sanctum\Sanctum;
+use Illuminate\Http\Request;
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -19,6 +20,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Sanctum::getAccessTokenFromRequestUsing(function (Request $request) {
+        return $request->query('token') ?? $request->bearerToken();
+    });
     }
 }

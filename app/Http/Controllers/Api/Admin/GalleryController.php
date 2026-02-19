@@ -14,17 +14,14 @@ class GalleryController extends Controller
     {
         $query = Gallery::query();
         
-        // Filter by type
-        if ($request->has('type')) {
+        if ($request->has('type') && $request->type != '') {
             $query->where('type', $request->type);
         }
         
-        // Search by title
-        if ($request->has('search')) {
+        if ($request->has('search') && $request->search != '') {
             $query->where('title', 'like', '%' . $request->search . '%');
         }
         
-        // Sort
         $sort = $request->sort ?? 'newest';
         switch ($sort) {
             case 'oldest':
@@ -38,46 +35,32 @@ class GalleryController extends Controller
                 break;
         }
         
-        $gallery = $query->get();
-        
-        return response()->json($gallery);
+        return $query->paginate(12); 
     }
 
     public function store(Request $request)
     {
+        // Update validation to check for file type and a 20MB max size (20480 KB)
         $validator = Validator::make($request->all(), [
-            'type' => 'required|in:image,video',
+            'type'  => 'required|in:image,video',
             'title' => 'nullable|string|max:255',
-            'file' => 'required'
+            'file'  => 'required|file|mimes:jpg,jpeg,png,mp4,mov,avi|max:20480'
         ]);
 
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'message' => 'The uploaded file is too large or invalid.',
+                'errors'  => $validator->errors()
             ], 422);
         }
 
         $data = $validator->validated();
 
-        // Handle file upload
         if ($request->hasFile('file')) {
-            if ($data['type'] === 'image') {
-                $path = $request->file('file')->store('gallery/images', 'public');
-                $data['file'] = Storage::url($path);
-            } else {
-                $path = $request->file('file')->store('gallery/videos', 'public');
-                $data['file'] = Storage::url($path);
-            }
-        } elseif ($request->has('file') && is_string($request->file)) {
-            // If file is already a URL (for direct URL uploads)
-            $data['file'] = $request->file;
-        } else {
-            return response()->json([
-                'success' => false,
-                'message' => 'No valid file provided'
-            ], 422);
+            $folder = ($data['type'] === 'image') ? 'gallery/images' : 'gallery/videos';
+            $path = $request->file('file')->store($folder, 'public');
+            $data['file'] = Storage::url($path);
         }
 
         $gallery = Gallery::create($data);
@@ -85,7 +68,7 @@ class GalleryController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Media uploaded successfully',
-            'data' => $gallery
+            'data'    => $gallery
         ]);
     }
 
@@ -99,7 +82,7 @@ class GalleryController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Validation failed',
-                'errors' => $validator->errors()
+                'errors'  => $validator->errors()
             ], 422);
         }
 
@@ -108,13 +91,12 @@ class GalleryController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Media updated successfully',
-            'data' => $gallery
+            'data'    => $gallery
         ]);
     }
 
     public function destroy(Gallery $gallery)
     {
-        // Delete file from storage
         if ($gallery->file) {
             $filePath = str_replace('/storage/', '', $gallery->file);
             Storage::disk('public')->delete($filePath);

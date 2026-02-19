@@ -42,7 +42,6 @@ class PilotController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
-            'is_active' => 'boolean',
             'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number',
             'license_type' => 'required|string|max:50',
             'expiry_date' => 'nullable|date',
@@ -92,7 +91,7 @@ class PilotController extends Controller
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $pilot->id,
             'phone' => 'nullable|string|max:20',
-            'is_active' => 'boolean',
+    
             'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number,' . ($pilot->pilotProfile->id ?? 0),
             'license_type' => 'nullable|string|max:50',
             'club_name' => 'nullable|string|max:100',
@@ -165,30 +164,89 @@ class PilotController extends Controller
         }
     }
 
-    public function export(Request $request)
+public function export(Request $request)
     {
-        $pilots = User::with('pilotProfile')
-            ->where('is_admin', false)
-            ->where('is_active', true)
-            ->get()
-            ->map(function($pilot) {
-                return [
-                    'Name' => $pilot->name,
-                    'Email' => $pilot->email,
-                    'Phone' => $pilot->phone,
-                    'License Number' => $pilot->pilotProfile->license_number ?? 'N/A',
-                    'License Type' => $pilot->pilotProfile->license_type ?? 'N/A',
-                    'Issued By' => $pilot->pilotProfile->issued_by ?? 'N/A',
-                    'Expiry Date' => $pilot->pilotProfile->expiry_date ?? 'N/A',
-                    'Club' => $pilot->pilotProfile->club_name ?? 'N/A',
-                    'Registered' => $pilot->created_at->format('Y-m-d'),
-                ];
-            });
+        $pilots = User::with('pilotProfile')->where('is_admin', false)->get();
+        
+        $fileName = 'pilots_export_' . date('Y-m-d') . '.csv';
+        $headers = [
+            "Content-type"        => "text/csv",
+            "Content-Disposition" => "attachment; filename=$fileName",
+            "Pragma"              => "no-cache",
+            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
+            "Expires"             => "0"
+        ];
 
-        return response()->json([
-            'success' => true,
-            'data' => $pilots,
-            'total' => $pilots->count()
+        $columns = ['Name', 'Email', 'Phone', 'License Number', 'License Type', 'Designation', 'Club', 'Status'];
+
+        $callback = function() use($pilots, $columns) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, $columns);
+
+            foreach ($pilots as $pilot) {
+                fputcsv($file, [
+                    $pilot->name,
+                    $pilot->email,
+                    $pilot->phone,
+                    $pilot->pilotProfile->license_number ?? 'N/A',
+                    $pilot->pilotProfile->license_type ?? 'N/A',
+                    $pilot->pilotProfile->designation ?? 'N/A',
+                    $pilot->pilotProfile->club_name ?? 'N/A',
+                    $pilot->is_active ? 'Active' : 'Inactive',
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function import(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'file' => 'required|file|mimes:csv,txt'
         ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => 'Please upload a valid CSV file.'], 422);
+        }
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+        fgetcsv($handle); // Skip header row
+
+        $count = 0;
+        DB::beginTransaction();
+        try {
+            while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                // $data: 0=Name, 1=Email, 2=Phone, 3=License#, 4=Type, 5=Designation
+                if (empty($data[1])) continue;
+
+                $user = User::updateOrCreate(
+                    ['email' => $data[1]],
+                    [
+                        'name' => $data[0],
+                        'phone' => $data[2] ?? null,
+                        'password' => bcrypt('password'),
+                        'is_active' => true
+                    ]
+                );
+
+                $user->pilotProfile()->updateOrCreate(
+                    ['user_id' => $user->id],
+                    [
+                        'license_number' => $data[3],
+                        'license_type' => $data[4] ?? 'paragliding',
+                        'designation' => $data[5] ?? null,
+                    ]
+                );
+                $count++;
+            }
+            DB::commit();
+            return response()->json(['success' => true, 'message' => "Successfully imported $count pilots."]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'message' => 'Import failed: ' . $e->getMessage()], 500);
+        }
     }
 }

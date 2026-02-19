@@ -121,9 +121,12 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::get('flying-locations/{flyingLocation}/qr-codes', [AdminFlyingLocationController::class, 'getQRCodes']);
         
         // Pilots
-        Route::apiResource('pilots', AdminPilotController::class);
-        Route::get('pilots/export', [AdminPilotController::class, 'export']);
-        
+    Route::get('pilots/export', [AdminPilotController::class, 'export']);
+    Route::post('pilots/import', [AdminPilotController::class, 'import']);
+
+    // 2. Resource routes SECOND
+    Route::apiResource('pilots', AdminPilotController::class);
+
 Route::post('/about-us', [PageContentController::class, 'updateAbout']);
     Route::post('/regulations', [PageContentController::class, 'storeRegulation']);
     Route::put('/regulations/{regulation}', [PageContentController::class, 'updateRegulation']);
