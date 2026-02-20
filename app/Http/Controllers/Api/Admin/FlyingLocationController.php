@@ -65,9 +65,9 @@ class FlyingLocationController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'type' => 'required|string',
-            'takeoff_kato' => 'required|string',
-            'takeoff_nazim' => 'required|string',
+            'type' => 'nullable|string',
+            'takeoff_kato' => 'nullable|string',
+            'takeoff_nazim' => 'nullable|string',
             'landing_kato' => 'nullable|string',
             'landing_nazim' => 'nullable|string',
             'boundaries_kato' => 'nullable|array',
