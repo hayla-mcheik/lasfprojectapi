@@ -17,6 +17,7 @@ class User extends Authenticatable
         'phone',
         'is_admin',
         'is_active',
+        'role',
     ];
 
     protected $hidden = [
@@ -28,6 +29,10 @@ class User extends Authenticatable
         'is_admin' => 'boolean',
         'is_active' => 'boolean',
     ];
+public function canManageLocations(): bool
+    {
+     return $this->is_admin == 1 || $this->role === 'army';
+    }
 
     // Relationships
     public function pilotProfile()
