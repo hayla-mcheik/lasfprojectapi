@@ -61,4 +61,35 @@ class PageContentController extends Controller
         $reg = Regulation::create($data);
         return response()->json(['success' => true, 'data' => $reg]);
     }
+    // Update an existing regulation
+    public function updateRegulation(Request $request, $id)
+    {
+        $reg = Regulation::findOrFail($id);
+
+        $data = $request->validate([
+            'category' => 'sometimes|required|string',
+            'title' => 'sometimes|required|string',
+            'content' => 'sometimes|required|string',
+            'is_critical' => 'boolean'
+        ]);
+
+        $reg->update($data);
+
+        return response()->json([
+            'success' => true, 
+            'data' => $reg
+        ]);
+    }
+
+    // Delete a regulation
+    public function destroyRegulation($id)
+    {
+        $reg = Regulation::findOrFail($id);
+        $reg->delete();
+
+        return response()->json([
+            'success' => true, 
+            'message' => 'Regulation deleted successfully'
+        ]);
+    }
 }
