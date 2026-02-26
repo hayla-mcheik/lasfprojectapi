@@ -109,8 +109,9 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::get('pilots/export', [AdminPilotController::class, 'export']);
         Route::post('pilots/import', [AdminPilotController::class, 'import']);
         Route::apiResource('pilots', AdminPilotController::class);
-// Weather Management
-        Route::apiResource('weather', AdminWeatherController::class);
+// Inside the Admin middleware group
+Route::get('weather', [AdminWeatherController::class, 'index']);
+Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
         // Content Management
         Route::apiResource('sports', AdminSportController::class);
         Route::apiResource('news', AdminNewsController::class);
