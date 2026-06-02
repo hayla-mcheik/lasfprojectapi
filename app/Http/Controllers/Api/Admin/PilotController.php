@@ -9,12 +9,14 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Carbon\Carbon;
 
 class PilotController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with('pilotProfile')->where('is_admin', false);
+        // Updated relation call to match camelCase method name: pilotProfile
+        $query = User::with(['pilotProfile.disciplines'])->where('is_admin', false);
 
         if ($request->has('search') && $request->search) {
             $search = $request->search;
@@ -23,16 +25,18 @@ class PilotController extends Controller
                   ->orWhere('email', 'like', "%{$search}%")
                   ->orWhereHas('pilotProfile', function($q) use ($search) {
                       $q->where('license_number', 'like', "%{$search}%")
-                        ->orWhere('club_name', 'like', "%{$search}%");
+                        ->orWhere('club_name', 'like', "%{$search}%")
+                        ->orWhere('ratings', 'like', "%{$search}%");
                   });
             });
         }
 
-        if ($request->has('status')) {
+        if ($request->has('status') && $request->status !== null) {
             $query->where('is_active', $request->status === 'active');
         }
 
         $perPage = $request->per_page ?? 20;
+        
         return response()->json($query->latest()->paginate($perPage));
     }
 
@@ -42,14 +46,18 @@ class PilotController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
-            'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number',
-            'license_type' => 'required|string|max:50',
-            'expiry_date' => 'nullable|date',
-            'club_name' => 'nullable|string|max:100',
-            'facebook_url' => 'nullable|url',
-            'instagram_url' => 'nullable|url',
+            'blood_type' => 'required|string|max:5',
+            'club_name' => 'required|string|max:100',
+            'club_code' => 'required|string|max:10',
+            'insurance_provider' => 'nullable|string|max:150',
+            'insurance_number' => 'nullable|string|max:100',
             'designation' => 'nullable|string|max:100',
-            'image' => 'nullable|image|max:2048'
+            'facebook_url' => 'nullable|url|max:255',
+            'instagram_url' => 'nullable|url|max:255',
+            'disciplines' => 'required|array',
+            'ratings' => 'required|array',
+            'image' => 'nullable|image|max:2048',
+            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096'
         ]);
 
         if ($validator->fails()) {
@@ -62,22 +70,52 @@ class PilotController extends Controller
                 'name' => $request->name,
                 'email' => $request->email,
                 'phone' => $request->phone,
-                'password' => bcrypt('password'), // Default password
+                'password' => bcrypt('password'),
                 'is_admin' => false,
                 'is_active' => $request->is_active ?? true,
             ]);
 
-            $profileData = $request->only(['license_number', 'license_type', 'expiry_date', 'club_name', 'facebook_url', 'instagram_url', 'designation']);
+            $currentYear = Carbon::now()->format('y'); 
+            $paddedClubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT); 
             
+            $clubSequenceCount = PilotProfile::where('club_code', $paddedClubCode)->count();
+            $sequence = str_pad($clubSequenceCount + 1, 4, '0', STR_PAD_LEFT); 
+            $generatedLicenseNumber = "{$currentYear}-{$paddedClubCode}-{$sequence}";
+
+            $avatarUrl = null;
             if ($request->hasFile('image')) {
-                $path = $request->file('image')->store('pilots', 'public');
-                $profileData['image'] = Storage::url($path);
+                $path = $request->file('image')->store('pilots/avatars', 'public');
+                $avatarUrl = Storage::url($path);
             }
 
-            $user->pilotProfile()->create($profileData);
+            $licenseAttachments = [];
+            if ($request->hasFile('licenses')) {
+                foreach ($request->file('licenses') as $file) {
+                    $licenseAttachments[] = $file->store('pilots/licenses', 'public');
+                }
+            }
+
+            // Updated relation builder call to use camelCase function: pilotProfile()
+            $profile = $user->pilotProfile()->create([
+                'license_number' => $generatedLicenseNumber,
+                'blood_type' => $request->blood_type,
+                'ratings' => implode(' | ', $request->ratings),
+                'insurance_provider' => $request->insurance_provider,
+                'insurance_number' => $request->insurance_number,
+                'club_name' => $request->club_name,
+                'club_code' => $paddedClubCode,
+                'facebook_url' => $request->facebook_url,
+                'instagram_url' => $request->instagram_url,
+                'designation' => $request->designation ?? 'Professional Pilot',
+                'image' => $avatarUrl,
+                'licenses_attachments' => $licenseAttachments,
+                'valid_until' => Carbon::now()->addYear(),
+            ]);
+
+            $profile->disciplines()->sync($request->disciplines);
 
             DB::commit();
-            return response()->json(['success' => true, 'data' => $user->load('pilotProfile')], 201);
+            return response()->json(['success' => true, 'data' => $user->load('pilotProfile.disciplines')], 201);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
@@ -86,19 +124,22 @@ class PilotController extends Controller
 
     public function update(Request $request, User $pilot)
     {
-        // FIX: Added ignore rule for unique constraints to prevent 422 errors when saving unchanged data
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:255',
             'email' => 'sometimes|email|unique:users,email,' . $pilot->id,
             'phone' => 'nullable|string|max:20',
-    
-            'license_number' => 'required|string|max:50|unique:pilot_profiles,license_number,' . ($pilot->pilotProfile->id ?? 0),
-            'license_type' => 'nullable|string|max:50',
-            'club_name' => 'nullable|string|max:100',
-            'facebook_url' => 'nullable|url',
-            'instagram_url' => 'nullable|url',
+            'blood_type' => 'required|string|max:5',
+            'club_name' => 'required|string|max:100',
+            'club_code' => 'required|string|max:10',
+            'insurance_provider' => 'nullable|string|max:150',
+            'insurance_number' => 'nullable|string|max:100',
             'designation' => 'nullable|string|max:100',
-            'image' => 'nullable|image|max:2048'
+            'facebook_url' => 'nullable|url|max:255',
+            'instagram_url' => 'nullable|url|max:255',
+            'disciplines' => 'required|array',
+            'ratings' => 'required|array',
+            'image' => 'nullable|image|max:2048',
+            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096'
         ]);
 
         if ($validator->fails()) {
@@ -107,25 +148,58 @@ class PilotController extends Controller
 
         DB::beginTransaction();
         try {
-            // Update User (Includes Phone)
             $pilot->update($request->only(['name', 'email', 'phone', 'is_active']));
+            
+            // Updated property call to camelCase relation: pilotProfile
+            $profile = $pilot->pilotProfile;
 
-            $profileData = $request->only(['license_number', 'license_type', 'club_name', 'expiry_date', 'facebook_url', 'instagram_url', 'designation']);
+            $oldClubCode = $profile?->club_code;
+            $newClubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT);
+            $licenseNumber = $profile?->license_number;
+
+            if ($oldClubCode !== $newClubCode) {
+                $currentYear = Carbon::now()->format('y');
+                $clubSequenceCount = PilotProfile::where('club_code', $newClubCode)->count();
+                $sequence = str_pad($clubSequenceCount + 1, 4, '0', STR_PAD_LEFT);
+                $licenseNumber = "{$currentYear}-{$newClubCode}-{$sequence}";
+            }
+
+            $profileData = [
+                'license_number' => $licenseNumber,
+                'blood_type' => $request->blood_type,
+                'ratings' => implode(' | ', $request->ratings),
+                'insurance_provider' => $request->insurance_provider,
+                'insurance_number' => $request->insurance_number,
+                'club_name' => $request->club_name,
+                'club_code' => $newClubCode,
+                'facebook_url' => $request->facebook_url,
+                'instagram_url' => $request->instagram_url,
+                'designation' => $request->designation
+            ];
 
             if ($request->hasFile('image')) {
-                // Delete old image if it exists
-                if ($pilot->pilotProfile && $pilot->pilotProfile->image) {
-                    $oldPath = str_replace('/storage/', '', $pilot->pilotProfile->image);
+                if ($profile && $profile->image) {
+                    $oldPath = str_replace('/storage/', '', $profile->image);
                     Storage::disk('public')->delete($oldPath);
                 }
-                $path = $request->file('image')->store('pilots', 'public');
+                $path = $request->file('image')->store('pilots/avatars', 'public');
                 $profileData['image'] = Storage::url($path);
             }
 
-            $pilot->pilotProfile()->updateOrCreate(['user_id' => $pilot->id], $profileData);
+            if ($request->hasFile('licenses')) {
+                $existingFiles = $profile?->licenses_attachments ?? [];
+                foreach ($request->file('licenses') as $file) {
+                    $existingFiles[] = $file->store('pilots/licenses', 'public');
+                }
+                $profileData['licenses_attachments'] = $existingFiles;
+            }
+
+            // Updated method call to use camelCase relation builder: pilotProfile()
+            $updatedProfile = $pilot->pilotProfile()->updateOrCreate(['user_id' => $pilot->id], $profileData);
+            $updatedProfile->disciplines()->sync($request->disciplines);
 
             DB::commit();
-            return response()->json(['success' => true, 'data' => $pilot->load('pilotProfile')]);
+            return response()->json(['success' => true, 'data' => $pilot->load('pilotProfile.disciplines')]);
         } catch (\Exception $e) {
             DB::rollBack();
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
@@ -140,22 +214,27 @@ class PilotController extends Controller
 
         DB::beginTransaction();
         try {
-            if ($pilot->pilotProfile) {
-                // Delete photo from storage
-                if ($pilot->pilotProfile->image) {
-                    $imagePath = str_replace('/storage/', '', $pilot->pilotProfile->image);
+            // Updated property call to camelCase relation: pilotProfile
+            $profile = $pilot->pilotProfile;
+            if ($profile) {
+                if ($profile->image) {
+                    $imagePath = str_replace('/storage/', '', $profile->image);
                     Storage::disk('public')->delete($imagePath);
                 }
-                $pilot->pilotProfile()->delete();
+                if (!empty($profile->licenses_attachments)) {
+                    foreach ($profile->licenses_attachments as $filePath) {
+                        Storage::disk('public')->delete($filePath);
+                    }
+                }
+                $profile->disciplines()->detach();
+                $profile->delete();
             }
 
-            // Optional: Handle related airspace sessions if they exist
             if (method_exists($pilot, 'airspaceSessions')) {
                 $pilot->airspaceSessions()->delete();
             }
 
             $pilot->delete();
-            
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Pilot deleted successfully']);
         } catch (\Exception $e) {
@@ -164,11 +243,12 @@ class PilotController extends Controller
         }
     }
 
-public function export(Request $request)
+    public function export(Request $request)
     {
-        $pilots = User::with('pilotProfile')->where('is_admin', false)->get();
+        // Updated relation tracking keyword to use camelCase: pilotProfile
+        $pilots = User::with(['pilotProfile'])->where('is_admin', false)->get();
         
-        $fileName = 'pilots_export_' . date('Y-m-d') . '.csv';
+        $fileName = 'pilots_registry_export_' . date('Y-m-d') . '.csv';
         $headers = [
             "Content-type"        => "text/csv",
             "Content-Disposition" => "attachment; filename=$fileName",
@@ -177,21 +257,30 @@ public function export(Request $request)
             "Expires"             => "0"
         ];
 
-        $columns = ['Name', 'Email', 'Phone', 'License Number', 'License Type', 'Designation', 'Club', 'Status'];
+        $columns = ['Name', 'Email', 'Phone', 'Member License Number', 'Blood Type', 'Ratings', 'Insurance Provider', 'Insurance Number', 'Club Name', 'Club Code', 'Designation', 'Facebook', 'Instagram', 'Valid Until', 'Status'];
 
         $callback = function() use($pilots, $columns) {
             $file = fopen('php://output', 'w');
             fputcsv($file, $columns);
 
             foreach ($pilots as $pilot) {
+                // Updated structural property check to use camelCase: pilotProfile
+                $prof = $pilot->pilotProfile;
                 fputcsv($file, [
                     $pilot->name,
                     $pilot->email,
                     $pilot->phone,
-                    $pilot->pilotProfile->license_number ?? 'N/A',
-                    $pilot->pilotProfile->license_type ?? 'N/A',
-                    $pilot->pilotProfile->designation ?? 'N/A',
-                    $pilot->pilotProfile->club_name ?? 'N/A',
+                    $prof->license_number ?? 'Pending',
+                    $prof->blood_type ?? 'N/A',
+                    $prof->ratings ?? 'None',
+                    $prof->insurance_provider ?? 'N/A',
+                    $prof->insurance_number ?? 'N/A',
+                    $prof->club_name ?? 'N/A',
+                    $prof->club_code ?? 'N/A',
+                    $prof->designation ?? 'Professional Pilot',
+                    $prof->facebook_url ?? '',
+                    $prof->instagram_url ?? '',
+                    $prof ? ($prof->valid_until ? $prof->valid_until->format('d/m/Y') : '') : '',
                     $pilot->is_active ? 'Active' : 'Inactive',
                 ]);
             }
@@ -213,13 +302,12 @@ public function export(Request $request)
 
         $file = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
-        fgetcsv($handle); // Skip header row
+        fgetcsv($handle); // Skip column descriptions header
 
         $count = 0;
         DB::beginTransaction();
         try {
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                // $data: 0=Name, 1=Email, 2=Phone, 3=License#, 4=Type, 5=Designation
                 if (empty($data[1])) continue;
 
                 $user = User::updateOrCreate(
@@ -232,21 +320,28 @@ public function export(Request $request)
                     ]
                 );
 
+                // Updated collection model query writer function to use camelCase: pilotProfile()
                 $user->pilotProfile()->updateOrCreate(
                     ['user_id' => $user->id],
                     [
-                        'license_number' => $data[3],
-                        'license_type' => $data[4] ?? 'paragliding',
-                        'designation' => $data[5] ?? null,
+                        'license_number' => !empty($data[3]) ? $data[3] : Carbon::now()->format('y') . '-' . str_pad($data[9] ?? '01', 2, '0', STR_PAD_LEFT) . '-' . str_pad(rand(1,999), 4, '0', STR_PAD_LEFT),
+                        'blood_type' => $data[4] ?? 'O+',
+                        'ratings' => $data[5] ?? 'None',
+                        'insurance_provider' => $data[6] ?? null,
+                        'insurance_number' => $data[7] ?? null,
+                        'club_name' => $data[8] ?? 'Thermique',
+                        'club_code' => str_pad($data[9] ?? '01', 2, '0', STR_PAD_LEFT),
+                        'designation' => $data[10] ?? 'Professional Pilot',
+                        'valid_until' => Carbon::now()->addYear()
                     ]
                 );
                 $count++;
             }
             DB::commit();
-            return response()->json(['success' => true, 'message' => "Successfully imported $count pilots."]);
+            return response()->json(['success' => true, 'message' => "Successfully imported $count pilots records into database structures."]);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json(['success' => false, 'message' => 'Import failed: ' . $e->getMessage()], 500);
+            return response()->json(['success' => false, 'message' => 'Import operational synchronization anomaly: ' . $e->getMessage()], 500);
         }
     }
 }
