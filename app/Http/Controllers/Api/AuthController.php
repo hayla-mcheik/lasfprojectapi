@@ -9,7 +9,8 @@ use Illuminate\Support\Facades\Hash;
 use App\Models\User;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\DB;
-
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 class AuthController extends Controller
 {
     // Login
@@ -25,7 +26,11 @@ public function login(Request $request)
         $profile = \App\Models\PilotProfile::where('license_number', $request->license_number)->first();
         
         // Verify profile exists and the linked user's phone matches
-        if (!$profile || $profile->user->phone !== $request->phone) {
+        if (
+    !$profile ||
+    !$profile->user ||
+    $profile->user->phone !== $request->phone
+) {
             return response()->json(['message' => 'License Number or Phone does not match our records.'], 401);
         }
         
@@ -43,6 +48,13 @@ public function login(Request $request)
             return response()->json(['message' => 'Admin credentials invalid'], 401);
         }
     }
+if (!$user->is_admin && !$user->is_approved) {
+
+    return response()->json([
+        'message' => 'Your membership application is awaiting administrator approval.'
+    ], 403);
+
+}
 
     $token = $user->createToken('api-token')->plainTextToken;
 
@@ -55,24 +67,44 @@ public function login(Request $request)
 
 public function register(Request $request)
 {
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'required|email|unique:users,email',
-        'password' => 'required|min:6|confirmed',
-        'phone' => 'required|string|max:20',
+    try {
 
-        'blood_type' => 'required',
-        'club_name' => 'required',
-        'club_code' => 'required',
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|email|unique:users,email',
+            'password' => 'required|min:6|confirmed',
+            'phone' => 'required|string|max:20',
 
-        'insurance_provider' => 'nullable|string',
-        'insurance_number' => 'nullable|string',
+            'blood_type' => 'required',
+            'club_name' => 'required',
+            'club_code' => 'required',
 
-        'ratings' => 'required|array',
-        'disciplines' => 'required|array',
+            'insurance_provider' => 'nullable|string',
+            'insurance_number' => 'nullable|string',
 
-        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-    ]);
+            'ratings' => 'required|array',
+            'disciplines' => 'required|array',
+
+            'date_of_birth' => 'required|date|before:today',
+
+            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        ], [
+            'email.unique' => 'This email is already registered.',
+            'password.confirmed' => 'Password confirmation does not match.',
+            'date_of_birth.required' => 'Date of birth is required.',
+            'date_of_birth.before' => 'Date of birth must be before today.',
+            'ratings.required' => 'Please select at least one rating.',
+            'disciplines.required' => 'Please select at least one discipline.',
+        ]);
+
+    } catch (\Illuminate\Validation\ValidationException $e) {
+
+        return response()->json([
+            'success' => false,
+            'message' => 'Validation failed',
+            'errors' => $e->errors()
+        ], 422);
+    }
 
     DB::beginTransaction();
 
@@ -83,7 +115,10 @@ public function register(Request $request)
             'email' => $request->email,
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
+
             'is_admin' => false,
+            'is_active' => false,
+            'is_approved' => false,
         ]);
 
         $currentYear = now()->format('y');
@@ -111,12 +146,18 @@ public function register(Request $request)
         $profile = PilotProfile::create([
             'user_id' => $user->id,
             'license_number' => $licenseNumber,
+
+            'date_of_birth' => $request->date_of_birth,
+
             'blood_type' => $request->blood_type,
             'ratings' => implode(' | ', $request->ratings ?? []),
+
             'insurance_provider' => $request->insurance_provider,
             'insurance_number' => $request->insurance_number,
+
             'club_name' => $request->club_name,
             'club_code' => $clubCode,
+
             'designation' => 'Pilot',
             'valid_until' => now()->addYear(),
 
@@ -127,11 +168,75 @@ public function register(Request $request)
             $profile->disciplines()->sync($request->disciplines);
         }
 
+        /*
+        |--------------------------------------------------------------------------
+        | Email Admin
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+
+            \Mail::raw(
+                "New LASF Membership Request\n\n" .
+                "Name: {$user->name}\n" .
+                "Email: {$user->email}\n" .
+                "Phone: {$user->phone}\n" .
+                "License Number: {$licenseNumber}\n" .
+                "Club: {$request->club_name}\n\n" .
+                "This member is waiting for approval.",
+                function ($message) use ($user) {
+
+                    $message->to('mikel.c.khalil@gmail.com')
+                        ->subject('New LASF Membership Request - ' . $user->name);
+
+                }
+            );
+
+        } catch (\Exception $mailError) {
+
+            \Log::error(
+                'Admin email failed: ' .
+                $mailError->getMessage()
+            );
+
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Email Pilot Confirmation
+        |--------------------------------------------------------------------------
+        */
+
+        try {
+
+            \Mail::raw(
+                "Dear {$user->name},\n\n" .
+                "Thank you for registering with LASF.\n\n" .
+                "Your membership application has been received and is awaiting administrator approval.\n\n" .
+                "License Number: {$licenseNumber}\n\n" .
+                "You will be able to login once your account has been approved by the administrator.",
+                function ($message) use ($user) {
+
+                    $message->to($user->email)
+                        ->subject('LASF Registration Received');
+
+                }
+            );
+
+        } catch (\Exception $mailError) {
+
+            \Log::error(
+                'Pilot email failed: ' .
+                $mailError->getMessage()
+            );
+
+        }
+
         DB::commit();
 
         return response()->json([
             'success' => true,
-            'message' => 'Pilot registered successfully',
+            'message' => 'Registration submitted successfully. Your membership is waiting for administrator approval.',
             'license_number' => $licenseNumber,
             'image' => $imagePath
         ]);
@@ -146,6 +251,59 @@ public function register(Request $request)
         ], 500);
     }
 }
+public function myMembership(Request $request)
+{
+    return response()->json([
+        'user' => $request->user()->load([
+            'pilotProfile.disciplines'
+        ])
+    ]);
+}
+public function updateMembership(Request $request)
+{
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'phone' => 'required|string|max:20',
+ 'date_of_birth' => 'required|date|before:today',
+        'blood_type' => 'required',
+        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+    ]);
+
+    $user = $request->user();
+
+    $user->update([
+        'name' => $request->name,
+        'phone' => $request->phone,
+    ]);
+
+    $profileData = [
+        'blood_type' => $request->blood_type,
+        'insurance_provider' => $request->insurance_provider,
+        'insurance_number' => $request->insurance_number,
+        'facebook_url' => $request->facebook_url,
+        'instagram_url' => $request->instagram_url,
+        'date_of_birth' => $request->date_of_birth,
+    ];
+
+    if ($request->hasFile('image')) {
+
+        $path = $request->file('image')->store(
+            'pilots/avatars',
+            'public'
+        );
+
+        $profileData['image'] = '/storage/' . $path;
+    }
+
+    $user->pilotProfile()->update($profileData);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Membership updated successfully.',
+        'user' => $user->load('pilotProfile.disciplines')
+    ]);
+}
+
 
     public function updateProfile(Request $request)
 {

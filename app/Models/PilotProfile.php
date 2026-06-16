@@ -27,6 +27,7 @@ class PilotProfile extends Model
         'image',
         'licenses_attachments',
         'valid_until',
+        'date_of_birth'
     ];
 
     /**
@@ -35,6 +36,7 @@ class PilotProfile extends Model
     protected $casts = [
         'licenses_attachments' => 'array',
         'valid_until' => 'date',
+        'date_of_birth' => 'date',
     ];
 
     /**

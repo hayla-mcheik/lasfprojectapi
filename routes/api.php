@@ -67,6 +67,10 @@ Route::get('/destinations', [DestinationController::class, 'index']);
 Route::get('/destinations/{slug}', [DestinationController::class, 'show']);
 Route::get('/sports', [SportController::class, 'index']);
 Route::get('/pilots', [PilotTeamController::class, 'index']);
+Route::get(
+    '/pilot/{license}',
+    [PilotTeamController::class, 'show']
+);
 Route::get('/gallery', [GalleryController::class, 'index']);
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{slug}', [EventController::class, 'show']);
@@ -106,9 +110,15 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->group(function () {
         
         // Pilots Management (Admin Only)
-        Route::get('pilots/export', [AdminPilotController::class, 'export']);
-        Route::post('pilots/import', [AdminPilotController::class, 'import']);
-        Route::apiResource('pilots', AdminPilotController::class);
+Route::get('pilots/export', [AdminPilotController::class, 'export']);
+Route::post('pilots/import', [AdminPilotController::class, 'import']);
+
+// NEW APPROVAL ROUTES
+Route::patch('pilots/{pilot}/approve', [AdminPilotController::class, 'approve']);
+Route::patch('pilots/{pilot}/reject', [AdminPilotController::class, 'reject']);
+
+// Existing CRUD
+Route::apiResource('pilots', AdminPilotController::class);
 // Inside the Admin middleware group
 Route::get('weather', [AdminWeatherController::class, 'index']);
 Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
@@ -141,8 +151,16 @@ Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
 */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
+
+    Route::get('/my-membership', [AuthController::class, 'myMembership']);
+Route::put(
+    '/my-membership',
+    [AuthController::class, 'updateMembership']
+);
+
     Route::post('/logout', [AuthController::class, 'logout']);
     Route::put('/user/profile', [AuthController::class, 'updateProfile']);
+
     Route::get('/airspace-sessions/active-pilot', [AirspaceSessionController::class, 'userActiveSession']);
     Route::post('/airspace-sessions', [AirspaceSessionController::class, 'store']);
     Route::post('/airspace-sessions/{id}/checkout', [AirspaceSessionController::class, 'checkout']);

@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
-
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Log;
 class PilotController extends Controller
 {
     public function index(Request $request)
@@ -46,6 +47,7 @@ class PilotController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'phone' => 'nullable|string|max:20',
+            'date_of_birth' => 'required|date',
             'blood_type' => 'required|string|max:5',
             'club_name' => 'required|string|max:100',
             'club_code' => 'required|string|max:10',
@@ -110,6 +112,7 @@ class PilotController extends Controller
                 'image' => $avatarUrl,
                 'licenses_attachments' => $licenseAttachments,
                 'valid_until' => Carbon::now()->addYear(),
+                'date_of_birth' => $request->date_of_birth,
             ]);
 
             $profile->disciplines()->sync($request->disciplines);
@@ -139,7 +142,8 @@ class PilotController extends Controller
             'disciplines' => 'required|array',
             'ratings' => 'required|array',
             'image' => 'nullable|image|max:2048',
-            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096'
+            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+            'date_of_birth' => 'required|date',
         ]);
 
         if ($validator->fails()) {
@@ -174,7 +178,8 @@ class PilotController extends Controller
                 'club_code' => $newClubCode,
                 'facebook_url' => $request->facebook_url,
                 'instagram_url' => $request->instagram_url,
-                'designation' => $request->designation
+                'designation' => $request->designation,
+                'date_of_birth' => $request->date_of_birth,
             ];
 
             if ($request->hasFile('image')) {
@@ -242,6 +247,55 @@ class PilotController extends Controller
             return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
         }
     }
+public function approve(User $pilot)
+{
+    $pilot->update([
+        'is_approved' => true,
+        'is_active' => true,
+    ]);
+
+    try {
+
+        Mail::raw(
+            "Dear {$pilot->name},\n\n" .
+            "Your LASF membership has been approved.\n\n" .
+            "You may now login to your account.",
+            function ($message) use ($pilot) {
+
+                $message->to($pilot->email)
+                    ->subject('LASF Membership Approved');
+
+            }
+        );
+
+    } catch (\Exception $e) {
+
+        \Log::error(
+            'Approval email failed: ' .
+            $e->getMessage()
+        );
+
+    }
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Member approved successfully.'
+    ]);
+}
+
+public function reject(User $pilot)
+{
+    $pilot->update([
+        'is_approved' => false,
+        'is_active' => false,
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'message' => 'Member rejected successfully.'
+    ]);
+}
+
 
     public function export(Request $request)
     {

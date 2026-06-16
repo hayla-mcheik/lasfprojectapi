@@ -18,6 +18,7 @@ class User extends Authenticatable
         'is_admin',
         'is_active',
         'role',
+        'is_approved',
     ];
 
     protected $hidden = [
@@ -28,6 +29,7 @@ class User extends Authenticatable
     protected $casts = [
         'is_admin' => 'boolean',
         'is_active' => 'boolean',
+        'is_approved' => 'boolean',
     ];
 public function canManageLocations(): bool
     {

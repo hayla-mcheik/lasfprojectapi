@@ -41,7 +41,7 @@ class ClearanceStatusController extends Controller
     public function update(Request $request, ClearanceStatus $clearanceStatus)
     {
         $data = $request->validate([
-  'status' => 'spmetimes|in:green,red',
+  'status' => 'sometimes|in:green,red',
             'reason' => 'nullable|string|max:500'
         ]);
 
