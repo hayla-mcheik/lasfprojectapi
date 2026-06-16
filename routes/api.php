@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\Admin\PageContentController;
 use App\Http\Controllers\Api\Admin\TestimonialController as AdminTestimonialController;
 use App\Http\Controllers\Api\Admin\PilotController as AdminPilotController;
 use App\Http\Controllers\Api\Admin\WeatherController as AdminWeatherController;
+use App\Http\Controllers\Api\PilotLocationController;
 use App\Http\Controllers\Api\WeatherController as PublicWeatherController;
 use App\Http\Controllers\Api\PublicPageController;
 use App\Http\Controllers\PilotTeamController;
@@ -88,7 +89,7 @@ Route::get('/weather-report', [PublicWeatherController::class, 'index']);
 Route::middleware(['auth:sanctum', 'army_access'])
     ->prefix('admin')
     ->group(function () {
-        
+        Route::get('/gps/live/{locationId}', [PilotLocationController::class, 'live']);
         // Shared Dashboard Stats
         Route::get('/dashboard', [DashboardController::class, 'stats']);
         
@@ -151,6 +152,7 @@ Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
 */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
+Route::post('/gps/update', [PilotLocationController::class, 'update']);
 
     Route::get('/my-membership', [AuthController::class, 'myMembership']);
 Route::put(

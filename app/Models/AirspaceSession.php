@@ -24,4 +24,9 @@ class AirspaceSession extends Model
     {
         return $this->belongsTo(User::class, 'pilot_id');
     }
+
+public function locations()
+{
+    return $this->hasMany(PilotLocation::class, 'airspace_session_id');
+}
 }

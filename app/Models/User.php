@@ -51,4 +51,9 @@ public function canManageLocations(): bool
     {
         return $this->hasMany(AirspaceSession::class, 'pilot_id');
     }
+
+    public function gpsLocations()
+{
+    return $this->hasMany(PilotLocation::class, 'pilot_id');
+}
 }
