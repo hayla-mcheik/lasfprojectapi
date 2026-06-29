@@ -40,13 +40,23 @@ class AirspaceSessionController extends Controller
     ]);
 
     // 1. Find the QR code and its associated location
-    $qr = \App\Models\QRCode::where('token', $request->token)->first();
+$qr = \App\Models\QRCode::where('token', $request->token)->first();
+
+if (!$qr) {
+    return response()->json([
+        'message' => 'Invalid QR'
+    ],404);
+}
+
 $location = $qr->location;
 
-$currentStatus = $location
-    ->clearanceStatuses()
-    ->latest()
-    ->first();
+$currentStatus = $location->latestStatus;
+
+dd([
+    'location_id' => $location->id,
+    'status' => optional($currentStatus)->status,
+    'location_name' => $location->name,
+]);
 
 if ($currentStatus) {
 
