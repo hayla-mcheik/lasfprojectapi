@@ -77,7 +77,7 @@ class FlyingLocationController extends Controller
             'sports' => 'nullable|array',
             'sports.*' => 'exists:sports,id',
             'is_enabled' => 'boolean',
-            'clearance_status' => 'required|in:green,red',
+        'clearance_status' => 'required|in:green,yellow,red',
             'clearance_reason' => 'nullable|string|max:500'
         ]);
 
@@ -158,7 +158,7 @@ class FlyingLocationController extends Controller
             'sports' => 'nullable|array',
             'sports.*' => 'exists:sports,id',
             'is_enabled' => 'boolean',
-            'clearance_status' => 'nullable|in:green,red',
+         'clearance_status' => 'nullable|in:green,yellow,red',
             'clearance_reason' => 'nullable|string|max:500'
         ]);
 

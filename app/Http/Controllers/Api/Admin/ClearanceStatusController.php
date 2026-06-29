@@ -24,7 +24,7 @@ class ClearanceStatusController extends Controller
     {
         $data = $request->validate([
             'flying_location_id' => 'required|exists:flying_locations,id',
-       'status' => 'required|in:green,red',
+            'status' => 'required|in:green,yellow,red',
             'reason' => 'nullable|string|max:500'
         ]);
 
@@ -41,7 +41,7 @@ class ClearanceStatusController extends Controller
     public function update(Request $request, ClearanceStatus $clearanceStatus)
     {
         $data = $request->validate([
-  'status' => 'sometimes|in:green,red',
+ 'status' => 'sometimes|in:green,yellow,red',
             'reason' => 'nullable|string|max:500'
         ]);
 

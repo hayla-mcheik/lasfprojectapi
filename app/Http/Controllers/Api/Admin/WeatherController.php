@@ -29,7 +29,13 @@ class WeatherController extends Controller
     public function update(Request $request, $id)
     {
         $forecast = WeatherForecast::findOrFail($id);
+$request->validate([
 
+    'flyable_status' => 'nullable|in:good,caution,not_flyable',
+
+    'flyable_message' => 'nullable|string|max:255',
+
+]);
         return DB::transaction(function () use ($request, $forecast) {
             // Update main fields
             $forecast->update($request->all());

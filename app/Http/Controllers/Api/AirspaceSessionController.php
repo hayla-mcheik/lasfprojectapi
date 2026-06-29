@@ -41,7 +41,28 @@ class AirspaceSessionController extends Controller
 
     // 1. Find the QR code and its associated location
     $qr = \App\Models\QRCode::where('token', $request->token)->first();
+$location = $qr->location;
 
+$currentStatus = $location
+    ->clearanceStatuses()
+    ->latest()
+    ->first();
+
+if ($currentStatus) {
+
+    if ($currentStatus->status === 'red') {
+        return response()->json([
+            'message' => 'This flying location is currently CLOSED.'
+        ], 422);
+    }
+
+    if ($currentStatus->status === 'yellow') {
+        return response()->json([
+            'message' => 'This flying location is currently PENDING approval.'
+        ], 422);
+    }
+
+}
     if (!$qr) {
         return response()->json(['message' => 'Invalid or expired QR code.'], 404);
     }

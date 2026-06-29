@@ -13,7 +13,7 @@ use App\Http\Controllers\Api\FlyingLocationController;
 use App\Http\Controllers\Api\AirspaceSessionController;
 use App\Http\Controllers\Api\NewsController;
 use App\Http\Controllers\Api\PageController;
-
+use App\Http\Controllers\Api\MembershipCardController;
 /*
 |--------------------------------------------------------------------------
 | FRONTEND (PUBLIC) CONTROLLERS
@@ -76,7 +76,7 @@ Route::get('/gallery', [GalleryController::class, 'index']);
 Route::get('/events', [EventController::class, 'index']);
 Route::get('/events/{slug}', [EventController::class, 'show']);
 Route::get('/testimonials', [TestimonialController::class, 'index']);
-Route::get('/airspace-sessions/active', [AirspaceSessionController::class, 'active']);
+// Route::get('/airspace-sessions/active', [AirspaceSessionController::class, 'active']);
 Route::get('/about-us', [PublicPageController::class, 'getAbout']);
 Route::get('/regulations', [PublicPageController::class, 'getRegulations']);
 Route::get('/weather-report', [PublicWeatherController::class, 'index']);
@@ -152,6 +152,8 @@ Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
 */
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/user', fn (Request $request) => $request->user());
+Route::post('/membership-card/download',
+    [MembershipCardController::class,'download']);
 Route::post('/gps/update', [PilotLocationController::class, 'update']);
 
     Route::get('/my-membership', [AuthController::class, 'myMembership']);

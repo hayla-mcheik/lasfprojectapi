@@ -14,11 +14,11 @@ class FlyingLocationController extends Controller
             ->with(['clearanceStatuses' => function($q) {
                 $q->latest();
             }])
-            ->withCount(['airspaceSessions as active_sessions_count' => function($q) {
-                $q->where('status', 'active')
-                  ->whereNull('checked_out_at')
-                  ->where('expires_at', '>', now());
-            }])
+            // ->withCount(['airspaceSessions as active_sessions_count' => function($q) {
+            //     $q->where('status', 'active')
+            //       ->whereNull('checked_out_at')
+            //       ->where('expires_at', '>', now());
+            // }])
             ->get();
 
    return response()->json(['data' => $locations]);
@@ -31,11 +31,11 @@ public function show($slug)
         'clearanceStatuses' => fn($q) => $q->latest(),
         'qrCode',
         // Load active sessions with pilot details for the "Live Airspace" sidebar
-        'airspaceSessions' => function($query) {
-            $query->where('status', 'active')
-                  ->where('expires_at', '>', now())
-                  ->with('pilot.pilotProfile'); 
-        }
+        // 'airspaceSessions' => function($query) {
+        //     $query->where('status', 'active')
+        //           ->where('expires_at', '>', now())
+        //           ->with('pilot.pilotProfile'); 
+        // }
     ])
     ->where('slug', $slug)
     ->firstOrFail();
