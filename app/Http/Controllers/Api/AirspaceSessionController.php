@@ -181,17 +181,46 @@ public function store(Request $request)
     /**
      * PRIVATE: Check-out (Landing).
      */
-    public function checkout(Request $request, $id)
-    {
-        $session = AirspaceSession::where('id', $id)
-            ->where('pilot_id', $request->user()->id)
-            ->firstOrFail();
+public function checkout(Request $request, $id)
+{
+    \Log::info('===== CHECK OUT START =====');
 
-        $session->update([
-            'checked_out_at' => now(),
-            'status' => 'closed',
+    $session = AirspaceSession::where('id', $id)
+        ->where('pilot_id', $request->user()->id)
+        ->first();
+
+    if (!$session) {
+
+        \Log::error('Session not found', [
+            'session_id' => $id,
+            'pilot_id' => $request->user()->id
         ]);
 
-        return response()->json($session);
+        return response()->json([
+            'message' => 'Session not found.'
+        ],404);
     }
+
+    \Log::info('Session Before Update', [
+        'id' => $session->id,
+        'status' => $session->status,
+        'checked_out_at' => $session->checked_out_at
+    ]);
+
+    $session->status = 'closed';
+    $session->checked_out_at = now();
+    $session->save();
+
+    $session->refresh();
+
+    \Log::info('Session After Update', [
+        'id' => $session->id,
+        'status' => $session->status,
+        'checked_out_at' => $session->checked_out_at
+    ]);
+
+    \Log::info('===== CHECK OUT END =====');
+
+    return response()->json($session);
+}
 }
