@@ -321,7 +321,7 @@ body{
         <table class="front-header">
             <tr>
                 <td class="logo-cell">
-             <img src="{{ public_path('storage/logocard.png') }}" alt="LASF Logo">
+             <img  src="{{ public_path('logocard.png') }}" alt="LASF Logo">
                 </td>
            
                 <td class="qr-cell">
