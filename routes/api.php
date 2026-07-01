@@ -89,6 +89,7 @@ Route::get('/weather-report', [PublicWeatherController::class, 'index']);
 Route::middleware(['auth:sanctum', 'army_access'])
     ->prefix('admin')
     ->group(function () {
+        Route::get('/gps/live', [PilotLocationController::class, 'liveAll']);
         Route::get('/gps/live/{locationId}', [PilotLocationController::class, 'live']);
         // Shared Dashboard Stats
         Route::get('/dashboard', [DashboardController::class, 'stats']);

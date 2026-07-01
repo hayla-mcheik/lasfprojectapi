@@ -40,19 +40,44 @@ class PilotLocationController extends Controller
         return response()->json($location);
     }
 
+    /**
+     * All active pilots
+     */
+    public function liveAll()
+    {
+        $sessions = AirspaceSession::with([
+            'pilot',
+            'location',
+            'locations' => function ($q) {
+                $q->latest()->limit(1);
+            }
+        ])
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+        ->get();
+
+        return response()->json($sessions);
+    }
+
+    /**
+     * Active pilots for one location
+     */
     public function live($locationId)
     {
         $sessions = AirspaceSession::with([
             'pilot',
+            'location',
             'locations' => function ($q) {
                 $q->latest()->limit(1);
             }
         ])
         ->where('flying_location_id', $locationId)
-  ->where('status', 'active')
-->whereNull('checked_out_at')
-->where('expires_at', '>', now())
-->get();
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+        ->get();
+
         return response()->json($sessions);
     }
 }
