@@ -45,10 +45,11 @@ use App\Http\Controllers\Api\Admin\TestimonialController as AdminTestimonialCont
 use App\Http\Controllers\Api\Admin\PilotController as AdminPilotController;
 use App\Http\Controllers\Api\Admin\WeatherController as AdminWeatherController;
 use App\Http\Controllers\Api\PilotLocationController;
+use App\Http\Controllers\Api\PilotSafetyMessageController;
 use App\Http\Controllers\Api\WeatherController as PublicWeatherController;
 use App\Http\Controllers\Api\PublicPageController;
 use App\Http\Controllers\PilotTeamController;
-
+use App\Http\Controllers\Api\Admin\PilotSafetyMessageController as AdminPilotSafetyMessageController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTES (NUXT FRONTEND)
@@ -80,6 +81,10 @@ Route::get('/testimonials', [TestimonialController::class, 'index']);
 Route::get('/about-us', [PublicPageController::class, 'getAbout']);
 Route::get('/regulations', [PublicPageController::class, 'getRegulations']);
 Route::get('/weather-report', [PublicWeatherController::class, 'index']);
+Route::get(
+    '/pilot-safety-message',
+    [PilotSafetyMessageController::class, 'index']
+);
 /*
 |--------------------------------------------------------------------------
 | SHARED ADMIN & ARMY ROUTES
@@ -124,6 +129,8 @@ Route::apiResource('pilots', AdminPilotController::class);
 // Inside the Admin middleware group
 Route::get('weather', [AdminWeatherController::class, 'index']);
 Route::put('weather/{id}', [AdminWeatherController::class, 'update']);
+Route::get('pilot-safety-message', [AdminPilotSafetyMessageController::class, 'index']);
+Route::put('pilot-safety-message', [AdminPilotSafetyMessageController::class, 'update']);
         // Content Management
         Route::apiResource('sports', AdminSportController::class);
         Route::apiResource('news', AdminNewsController::class);

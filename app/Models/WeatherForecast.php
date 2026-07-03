@@ -22,7 +22,8 @@ protected $fillable = [
     'visibility_ar',
     'humidity_range',
     'flyable_status',
-    'flyable_message'
+    'flyable_message',
+        'safety_message',
 
 ];
 

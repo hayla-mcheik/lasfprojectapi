@@ -88,6 +88,7 @@ public function register(Request $request)
             'date_of_birth' => 'required|date|before:today',
 
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+            'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
         ], [
             'email.unique' => 'This email is already registered.',
             'password.confirmed' => 'Password confirmation does not match.',
@@ -143,6 +144,18 @@ public function register(Request $request)
             $imagePath = '/storage/' . $imagePath;
         }
 
+        $licenseAttachment = null;
+
+if ($request->hasFile('license_attachment')) {
+
+    $licenseAttachment = $request->file('license_attachment')->store(
+        'pilots/licenses',
+        'public'
+    );
+
+    $licenseAttachment = '/storage/' . $licenseAttachment;
+}
+
         $profile = PilotProfile::create([
             'user_id' => $user->id,
             'license_number' => $licenseNumber,
@@ -162,6 +175,7 @@ public function register(Request $request)
             'valid_until' => now()->addYear(),
 
             'image' => $imagePath,
+            'licenses_attachments' => $licenseAttachment,
         ]);
 
         if ($request->disciplines) {
@@ -267,6 +281,7 @@ public function updateMembership(Request $request)
  'date_of_birth' => 'required|date|before:today',
         'blood_type' => 'required',
         'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+        'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
     ]);
 
     $user = $request->user();
@@ -286,6 +301,15 @@ public function updateMembership(Request $request)
     ];
 
     if ($request->hasFile('image')) {
+        if ($request->hasFile('license_attachment')) {
+
+    $path = $request->file('license_attachment')->store(
+        'pilots/licenses',
+        'public'
+    );
+
+    $profileData['licenses_attachments'] = '/storage/' . $path;
+}
 
         $path = $request->file('image')->store(
             'pilots/avatars',
