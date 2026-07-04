@@ -416,7 +416,7 @@ return response()->json(
                 'index' => $index,
                 'name' => basename($file),
                 'view' => asset($file),
-                'download' => url("/api/admin/pilots/{$pilot->id}/licenses/{$index}")
+     'download' => url("/admin/pilots/{$pilot->id}/licenses/{$index}")
             ];
 
         })
