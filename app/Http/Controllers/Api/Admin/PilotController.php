@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
+
 class PilotController extends Controller
 {
     public function index(Request $request)
@@ -398,4 +399,44 @@ public function reject(User $pilot)
             return response()->json(['success' => false, 'message' => 'Import operational synchronization anomaly: ' . $e->getMessage()], 500);
         }
     }
+
+public function licenses(User $pilot)
+{
+    $profile = $pilot->pilotProfile;
+
+    if (!$profile) {
+        return response()->json([]);
+    }
+
+return response()->json(
+    collect($profile->licenses_attachments ?? [])
+        ->map(function ($file, $index) use ($pilot) {
+
+            return [
+                'index' => $index,
+                'name' => basename($file),
+                'view' => asset('storage/' . $file),
+                'download' => url("/api/admin/pilots/{$pilot->id}/licenses/{$index}")
+            ];
+
+        })
+        ->values()
+);
+}
+public function downloadLicense(User $pilot, $index)
+{
+    $profile = $pilot->pilotProfile;
+
+    if (!$profile) {
+        abort(404);
+    }
+
+    $files = $profile->licenses_attachments ?? [];
+
+    if (!isset($files[$index])) {
+        abort(404);
+    }
+
+    return Storage::disk('public')->download($files[$index]);
+}
 }

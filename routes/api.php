@@ -119,7 +119,14 @@ Route::middleware(['auth:sanctum', 'admin'])
         // Pilots Management (Admin Only)
 Route::get('pilots/export', [AdminPilotController::class, 'export']);
 Route::post('pilots/import', [AdminPilotController::class, 'import']);
-
+Route::get(
+    'pilots/{pilot}/licenses',
+    [AdminPilotController::class, 'licenses']
+);
+Route::get(
+    'pilots/{pilot}/licenses/{index}',
+    [AdminPilotController::class, 'downloadLicense']
+);
 // NEW APPROVAL ROUTES
 Route::patch('pilots/{pilot}/approve', [AdminPilotController::class, 'approve']);
 Route::patch('pilots/{pilot}/reject', [AdminPilotController::class, 'reject']);
