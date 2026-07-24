@@ -60,6 +60,7 @@ class DashboardController extends Controller
                 ->whereNull('checked_out_at')
                 ->where('expires_at', '>', Carbon::now())
                 ->count();
+                $activePilotsByLocation = $this->getActivePilotsByLocation();
             
             // Get daily stats for the last 7 days
             $dailyStats = $this->getDailyStats();
@@ -67,15 +68,25 @@ class DashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'data' => [
-                    'stats' => [
-                        'activeLocations' => $activeLocations,
-                        'activePilots' => $activePilots,
-                        'qrScansToday' => $qrScansToday,
-                        'qrScansChange' => $qrScansChange,
-                        'activeNews' => $activeNews,
-                        'unpublishedNews' => $unpublishedNews,
-                        'activeSessions' => $activeSessions,
-                    ],
+       'stats' => [
+
+    'activeLocations' => $activeLocations,
+
+    'activePilots' => $activePilots,
+
+    'qrScansToday' => $qrScansToday,
+
+    'qrScansChange' => $qrScansChange,
+
+    'activeNews' => $activeNews,
+
+    'unpublishedNews' => $unpublishedNews,
+
+    'activeSessions' => $activeSessions,
+
+    'activePilotsByLocation' => $activePilotsByLocation,
+
+],
                     'locationStatus' => $locationStatus,
                     'recentActivities' => $recentActivities,
                     'urgentNotices' => $urgentNotices,
@@ -343,4 +354,33 @@ private function getRedStatusLocations()
             ],
         ];
     }
+    private function getActivePilotsByLocation()
+{
+    return AirspaceSession::query()
+        ->with('location:id,name')
+
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+
+        ->selectRaw('flying_location_id, COUNT(*) as total')
+
+        ->groupBy('flying_location_id')
+
+        ->get()
+
+        ->map(function ($session) {
+
+            return [
+
+                'location_id' => $session->flying_location_id,
+
+                'location_name' => optional($session->location)->name,
+
+                'total' => (int) $session->total,
+
+            ];
+
+        });
+}
 }

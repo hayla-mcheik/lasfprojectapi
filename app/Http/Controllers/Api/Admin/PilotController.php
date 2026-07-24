@@ -44,24 +44,44 @@ class PilotController extends Controller
 
     public function store(Request $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string|max:20',
-            'date_of_birth' => 'required|date',
-            'blood_type' => 'required|string|max:5',
-            'club_name' => 'required|string|max:100',
-            'club_code' => 'required|string|max:10',
-            'insurance_provider' => 'nullable|string|max:150',
-            'insurance_number' => 'nullable|string|max:100',
-            'designation' => 'nullable|string|max:100',
-            'facebook_url' => 'nullable|url|max:255',
-            'instagram_url' => 'nullable|url|max:255',
-            'disciplines' => 'required|array',
-            'ratings' => 'required|array',
-            'image' => 'nullable|image|max:2048',
-            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096'
-        ]);
+ $validator = Validator::make($request->all(), [
+
+    'name' => 'required|string|max:255',
+    'email' => 'required|email|unique:users,email',
+    'phone' => 'nullable|string|max:20',
+
+    'date_of_birth' => 'required|date',
+
+    'blood_type' => 'required|string|max:5',
+
+    'club_name' => 'required|string|max:100',
+
+    'club_code' => 'required|string|max:10',
+
+    'insurance_provider' => 'nullable|string|max:150',
+
+    'insurance_number' => 'nullable|string|max:100',
+
+    'designation' => 'nullable|string|max:100',
+
+    'facebook_url' => 'nullable|url|max:255',
+
+    'instagram_url' => 'nullable|url|max:255',
+
+    'disciplines' => 'required|array',
+
+    'ratings' => 'required|array',
+
+    'image' => 'nullable|image|max:2048',
+
+    'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+
+    // NEW
+    'is_banned' => 'nullable|boolean',
+    'ban_until' => 'nullable|date',
+    'ban_reason' => 'nullable|string|max:1000',
+
+]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
@@ -112,8 +132,17 @@ class PilotController extends Controller
                 'designation' => $request->designation ?? 'Professional Pilot',
                 'image' => $avatarUrl,
                 'licenses_attachments' => $licenseAttachments,
-                'valid_until' => Carbon::now()->addYear(),
-                'date_of_birth' => $request->date_of_birth,
+        'valid_until' => Carbon::now()->addYear(),
+
+'date_of_birth' => $request->date_of_birth,
+
+'is_banned' => $request->boolean('is_banned'),
+
+'ban_until' => $request->filled('ban_until')
+    ? Carbon::parse($request->ban_until)
+    : null,
+
+'ban_reason' => $request->ban_reason,
             ]);
 
             $profile->disciplines()->sync($request->disciplines);
@@ -143,8 +172,14 @@ class PilotController extends Controller
             'disciplines' => 'required|array',
             'ratings' => 'required|array',
             'image' => 'nullable|image|max:2048',
-            'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
-            'date_of_birth' => 'required|date',
+         'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+
+'date_of_birth' => 'required|date',
+
+// NEW
+'is_banned' => 'nullable|boolean',
+'ban_until' => 'nullable|date',
+'ban_reason' => 'nullable|string|max:1000',
         ]);
 
         if ($validator->fails()) {
@@ -169,19 +204,43 @@ class PilotController extends Controller
                 $licenseNumber = "{$currentYear}-{$newClubCode}-{$sequence}";
             }
 
-            $profileData = [
-                'license_number' => $licenseNumber,
-                'blood_type' => $request->blood_type,
-                'ratings' => implode(' | ', $request->ratings),
-                'insurance_provider' => $request->insurance_provider,
-                'insurance_number' => $request->insurance_number,
-                'club_name' => $request->club_name,
-                'club_code' => $newClubCode,
-                'facebook_url' => $request->facebook_url,
-                'instagram_url' => $request->instagram_url,
-                'designation' => $request->designation,
-                'date_of_birth' => $request->date_of_birth,
-            ];
+$profileData = [
+
+    'license_number' => $licenseNumber,
+
+    'blood_type' => $request->blood_type,
+
+    'ratings' => implode(' | ', $request->ratings),
+
+    'insurance_provider' => $request->insurance_provider,
+
+    'insurance_number' => $request->insurance_number,
+
+    'club_name' => $request->club_name,
+
+    'club_code' => $newClubCode,
+
+    'facebook_url' => $request->facebook_url,
+
+    'instagram_url' => $request->instagram_url,
+
+    'designation' => $request->designation,
+
+    'date_of_birth' => $request->date_of_birth,
+
+    // ------------------------
+    // NEW BAN FIELDS
+    // ------------------------
+
+    'is_banned' => $request->boolean('is_banned'),
+
+    'ban_until' => $request->filled('ban_until')
+        ? Carbon::parse($request->ban_until)
+        : null,
+
+    'ban_reason' => $request->ban_reason,
+
+];
 
             if ($request->hasFile('image')) {
                 if ($profile && $profile->image) {

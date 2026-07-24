@@ -27,17 +27,32 @@ class PilotProfile extends Model
         'image',
         'licenses_attachments',
         'valid_until',
-        'date_of_birth'
+        'date_of_birth',
+        'is_banned',
+'ban_until',
+'ban_reason',
     ];
 
     /**
      * Cast JSON array blocks back to PHP arrays automatically.
      */
-    protected $casts = [
-        'licenses_attachments' => 'array',
-        'valid_until' => 'date',
-        'date_of_birth' => 'date',
-    ];
+protected $casts = [
+
+    'ratings' => 'array',
+
+    'disciplines' => 'array',
+
+    'licenses_attachments' => 'array',
+
+    'valid_until' => 'date',
+
+    'date_of_birth' => 'date',
+
+    'ban_until' => 'date',
+
+    'is_banned' => 'boolean',
+
+];
 
     /**
      * Relationship with the core User account.
@@ -56,4 +71,16 @@ class PilotProfile extends Model
         return $this->belongsToMany(Sport::class, 'pilot_profile_sport', 'pilot_profile_id', 'sport_id')
                     ->withTimestamps();
     }
+    public function isCurrentlyBanned(): bool
+{
+    if (!$this->is_banned) {
+        return false;
+    }
+
+    if (!$this->ban_until) {
+        return true;
+    }
+
+    return now()->lte($this->ban_until);
+}
 }

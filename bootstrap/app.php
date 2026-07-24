@@ -11,20 +11,31 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: '' 
+        // apiPrefix: '' 
     )
-    ->withMiddleware(function (Middleware $middleware) {
-        $middleware->validateCsrfTokens(except: [
-            'api/*',
-        ]);
+->withMiddleware(function (Middleware $middleware) {
 
-        // Register your middleware aliases here
-        $middleware->alias([
-            'admin' => \App\Http\Middleware\AdminMiddleware::class,
-            // ✅ Add the new Army permission gatekeeper
-            'army_access' => \App\Http\Middleware\ArmyAccess::class,
-        ]);
-    })
+    $middleware->validateCsrfTokens(except: [
+        'api/*',
+    ]);
+
+    $middleware->alias([
+
+        'admin' =>
+            \App\Http\Middleware\AdminMiddleware::class,
+
+        'army_access' =>
+            \App\Http\Middleware\ArmyAccess::class,
+
+        'dashboard_access' =>
+            \App\Http\Middleware\DashboardAccess::class,
+
+        'pilot_view_access' =>
+            \App\Http\Middleware\PilotViewAccess::class,
+
+    ]);
+
+})
     ->withExceptions(function (Exceptions $exceptions) {
         /**
          * ✅ FIX: "The GET method is not supported for route api/login"

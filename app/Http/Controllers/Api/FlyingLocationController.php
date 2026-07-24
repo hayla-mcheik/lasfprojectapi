@@ -4,42 +4,84 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\FlyingLocation;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class FlyingLocationController extends Controller
 {
-    public function index()
+    /**
+     * Public flying locations.
+     */
+    public function index(Request $request): JsonResponse
     {
-        $locations = FlyingLocation::with(['sports', 'qrCode'])
-            ->with(['clearanceStatuses' => function($q) {
-                $q->latest();
-            }])
-            // ->withCount(['airspaceSessions as active_sessions_count' => function($q) {
-            //     $q->where('status', 'active')
-            //       ->whereNull('checked_out_at')
-            //       ->where('expires_at', '>', now());
-            // }])
+        $date = $request->input(
+            'date',
+            today()->toDateString()
+        );
+
+        $locations = FlyingLocation::query()
+            ->where('is_enabled', true)
+            ->with([
+
+                'sports',
+
+                'qrCode',
+
+                'clearanceStatuses' => function ($query) use ($date) {
+
+                    $query
+                        ->whereDate('permission_date', $date)
+                        ->with('updatedBy')
+                        ->latest();
+
+                },
+
+            ])
+            ->orderBy('name')
             ->get();
 
-   return response()->json(['data' => $locations]);
+        return response()->json([
+            'success' => true,
+            'date' => $date,
+            'data' => $locations,
+        ]);
     }
 
-public function show($slug)
-{
-    $location = FlyingLocation::with([
-        'sports',
-        'clearanceStatuses' => fn($q) => $q->latest(),
-        'qrCode',
-        // Load active sessions with pilot details for the "Live Airspace" sidebar
-        // 'airspaceSessions' => function($query) {
-        //     $query->where('status', 'active')
-        //           ->where('expires_at', '>', now())
-        //           ->with('pilot.pilotProfile'); 
-        // }
-    ])
-    ->where('slug', $slug)
-    ->firstOrFail();
+    /**
+     * Single flying location.
+     */
+    public function show(Request $request, string $slug): JsonResponse
+    {
+        $date = $request->input(
+            'date',
+            today()->toDateString()
+        );
 
-    return response()->json(['data' => $location]);
-}
+        $location = FlyingLocation::query()
+            ->where('slug', $slug)
+            ->where('is_enabled', true)
+            ->with([
+
+                'sports',
+
+                'qrCode',
+
+                'clearanceStatuses' => function ($query) use ($date) {
+
+                    $query
+                        ->whereDate('permission_date', $date)
+                        ->with('updatedBy')
+                        ->latest();
+
+                },
+
+            ])
+            ->firstOrFail();
+
+        return response()->json([
+            'success' => true,
+            'date' => $date,
+            'data' => $location,
+        ]);
+    }
 }

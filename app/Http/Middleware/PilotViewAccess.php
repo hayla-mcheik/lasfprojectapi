@@ -6,7 +6,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
-class ArmyAccess
+class PilotViewAccess
 {
     public function handle(
         Request $request,
@@ -14,13 +14,13 @@ class ArmyAccess
     ): Response {
         $user = $request->user();
 
-        if ($user && $user->canManageLocations()) {
+        if ($user && $user->canViewPilots()) {
             return $next($request);
         }
 
         return response()->json([
             'success' => false,
-            'message' => 'Access Denied: Admin or Army privileges required.',
+            'message' => 'Access Denied: Pilot viewing permission required.',
         ], 403);
     }
 }

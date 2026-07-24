@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\FlyingLocation;
 use App\Models\QRCode;
 use App\Models\ClearanceStatus;
+use App\Models\ClearanceStatusHistory;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -15,209 +16,282 @@ use Ramsey\Uuid\Uuid;
 
 class FlyingLocationController extends Controller
 {
-    public function index(Request $request)
-    {
-        $query = FlyingLocation::with(['sports', 'clearanceStatuses' => function($q) {
-            $q->latest()->limit(1);
-        }, 'qrCode'])
-            ->withCount(['airspaceSessions as active_sessions' => function($q) {
-                $q->where('status', 'active')
-                  ->whereNull('checked_out_at')
-                  ->where('expires_at', '>', now());
-            }]);
+public function index(Request $request)
+{
+$date = $request->input('date', today()->toDateString());
 
-        // Updated Search: Includes technical Kato/Nazim coordinates
-        if ($request->has('search') && $request->search) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('type', 'like', "%{$search}%")
-                  ->orWhere('takeoff_kato', 'like', "%{$search}%")
-                  ->orWhere('takeoff_nazim', 'like', "%{$search}%");
-            });
-        }
+$query = FlyingLocation::with([
 
-        // Status filter (based on clearance status)
-        if ($request->has('status') && $request->status) {
-            $status = $request->status;
-            $query->whereHas('clearanceStatuses', function($q) use ($status) {
-                $q->where('status', $status)
-                  ->whereIn('id', function($subquery) {
-                      $subquery->select(DB::raw('MAX(id)'))
-                               ->from('clearance_statuses')
-                               ->groupBy('flying_location_id');
-                  });
-            });
-        }
+    'sports',
 
-        // Enabled filter
-        if ($request->has('enabled')) {
-            $query->where('is_enabled', filter_var($request->enabled, FILTER_VALIDATE_BOOLEAN));
-        }
+    'qrCode',
 
-        $perPage = $request->per_page ?? 20;
-        $locations = $query->orderBy('name')->paginate($perPage);
+    'clearanceStatuses' => function ($query) use ($date) {
 
-        return response()->json($locations);
+        $query
+            ->whereDate('permission_date', $date)
+            ->orderByDesc('permission_date');
+
+    },
+
+])->withCount([
+    'activeSessions as active_sessions'
+]);
+
+    if ($request->filled('search')) {
+
+        $search = $request->search;
+
+        $query->where(function ($q) use ($search) {
+
+            $q->where('name', 'like', "%{$search}%")
+                ->orWhere('type', 'like', "%{$search}%")
+                ->orWhere('takeoff_kato', 'like', "%{$search}%")
+                ->orWhere('takeoff_nazim', 'like', "%{$search}%");
+
+        });
+
     }
 
-    public function store(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'type' => 'nullable|string',
-            'takeoff_kato' => 'nullable|string',
-            'takeoff_nazim' => 'nullable|string',
-            'landing_kato' => 'nullable|string',
-            'landing_nazim' => 'nullable|string',
-            'boundaries_kato' => 'nullable|array',
-            'boundaries_nazim' => 'nullable|array',
-            'max_altitude' => 'nullable|string',
-            'description' => 'nullable|string',
-            'sports' => 'nullable|array',
-            'sports.*' => 'exists:sports,id',
-            'is_enabled' => 'boolean',
+    if ($request->filled('enabled')) {
+
+        $query->where(
+            'is_enabled',
+            filter_var(
+                $request->enabled,
+                FILTER_VALIDATE_BOOLEAN
+            )
+        );
+
+    }
+
+    $locations = $query
+        ->orderBy('name')
+        ->paginate($request->per_page ?? 20);
+
+    return response()->json($locations);
+}
+
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
+        'name' => 'required|string|max:255',
+        'type' => 'nullable|string',
+        'takeoff_kato' => 'nullable|string',
+        'takeoff_nazim' => 'nullable|string',
+        'landing_kato' => 'nullable|string',
+        'landing_nazim' => 'nullable|string',
+        'boundaries_kato' => 'nullable|array',
+        'boundaries_nazim' => 'nullable|array',
+        'max_altitude' => 'nullable|string',
+        'description' => 'nullable|string',
+        'sports' => 'nullable|array',
+        'sports.*' => 'exists:sports,id',
+        'is_enabled' => 'boolean',
+
+        // Initial status
         'clearance_status' => 'required|in:green,yellow,red',
-            'clearance_reason' => 'nullable|string|max:500'
+        'clearance_reason' => 'nullable|string|max:500',
+    ]);
+
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+    $data = $validator->validated();
+
+    $data['slug'] = Str::slug($data['name']);
+    $data['is_enabled'] = $data['is_enabled'] ?? true;
+
+    DB::beginTransaction();
+
+    try {
+
+        $location = FlyingLocation::create([
+            'name' => $data['name'],
+            'slug' => $data['slug'],
+            'type' => $data['type'] ?? null,
+            'takeoff_kato' => $data['takeoff_kato'] ?? null,
+            'takeoff_nazim' => $data['takeoff_nazim'] ?? null,
+            'landing_kato' => $data['landing_kato'] ?? null,
+            'landing_nazim' => $data['landing_nazim'] ?? null,
+            'boundaries_kato' => $data['boundaries_kato'] ?? null,
+            'boundaries_nazim' => $data['boundaries_nazim'] ?? null,
+            'max_altitude' => $data['max_altitude'] ?? null,
+            'is_enabled' => $data['is_enabled'],
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+        if (!empty($data['sports'])) {
+            $location->sports()->sync($data['sports']);
         }
 
-        $data = $validator->validated();
-        $data['slug'] = Str::slug($data['name']);
-        $data['is_enabled'] = $data['is_enabled'] ?? true;
+        $permission = ClearanceStatus::create([
+            'flying_location_id' => $location->id,
+            'permission_date'    => today(),
+            'status'             => $data['clearance_status'],
+            'reason'             => $data['clearance_reason'] ?? null,
+            'updated_by'         => auth()->id(),
+        ]);
 
-        DB::beginTransaction();
-        try {
-            $location = FlyingLocation::create($data);
+        ClearanceStatusHistory::create([
+            'clearance_status_id' => $permission->id,
+            'flying_location_id'  => $location->id,
+            'permission_date'     => today(),
+            'old_status'          => null,
+            'old_reason'          => null,
+            'new_status'          => $permission->status,
+            'new_reason'          => $permission->reason,
+            'changed_by'          => auth()->id(),
+            'action'              => 'created',
+        ]);
 
-            if (isset($data['sports']) && is_array($data['sports'])) {
-                $location->sports()->sync($data['sports']);
-            }
+        DB::commit();
 
-            // Create initial clearance status
-            $location->clearanceStatuses()->create([
-                'status' => $data['clearance_status'],
-                'reason' => $data['clearance_reason'] ?? null,
-                'updated_by' => auth()->id()
-            ]);
-
-            DB::commit();
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Location created successfully',
-                'data' => $location->load(['sports', 'clearanceStatuses', 'qrCode'])
-            ]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to create location',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function show(FlyingLocation $flyingLocation)
-    {
-        $flyingLocation->load(['sports', 'clearanceStatuses', 'qrCode', 
-            'airspaceSessions' => function($q) {
-                $q->where('status', 'active')
-                  ->whereNull('checked_out_at')
-                  ->with('pilot')
-                  ->latest();
-            }]);
-        
         return response()->json([
             'success' => true,
-            'data' => $flyingLocation
-        ]);
-    }
-
-    public function update(Request $request, FlyingLocation $flyingLocation)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'type' => 'sometimes|string',
-            'takeoff_kato' => 'sometimes|string',
-            'takeoff_nazim' => 'sometimes|string',
-            'landing_kato' => 'nullable|string',
-            'landing_nazim' => 'nullable|string',
-            'boundaries_kato' => 'nullable|array',
-            'boundaries_nazim' => 'nullable|array',
-            'max_altitude' => 'nullable|string',
-            'description' => 'nullable|string',
-            'sports' => 'nullable|array',
-            'sports.*' => 'exists:sports,id',
-            'is_enabled' => 'boolean',
-         'clearance_status' => 'nullable|in:green,yellow,red',
-            'clearance_reason' => 'nullable|string|max:500'
+            'message' => 'Location created successfully',
+            'data' => $location->load([
+                'sports',
+                'qrCode',
+                'clearanceStatuses' => function ($query) {
+                    $query->whereDate('permission_date', today());
+                },
+            ]),
         ]);
 
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+    } catch (\Exception $e) {
 
-        $data = $validator->validated();
+        DB::rollBack();
 
-        if (isset($data['name'])) {
-            $data['slug'] = Str::slug($data['name']);
-        }
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 500);
 
-        DB::beginTransaction();
-        try {
-            $flyingLocation->update($data);
+    }
+}
+public function show(Request $request, FlyingLocation $flyingLocation)
+{
+    $date = $request->input('date', today()->toDateString());
 
-            if (isset($data['sports'])) {
-                $flyingLocation->sports()->sync($data['sports']);
-            }
+    $flyingLocation->load([
 
-            if (isset($data['clearance_status'])) {
-                $latestStatus = $flyingLocation->clearanceStatuses()->latest()->first();
-                
-                if (!$latestStatus || $latestStatus->status !== $data['clearance_status']) {
-                    $flyingLocation->clearanceStatuses()->create([
-                        'status' => $data['clearance_status'],
-                        'reason' => $data['clearance_reason'] ?? null,
-                        'updated_by' => auth()->id()
-                    ]);
-                } elseif ($latestStatus && $latestStatus->reason !== ($data['clearance_reason'] ?? null)) {
-                    $latestStatus->update([
-                        'reason' => $data['clearance_reason'] ?? null
-                    ]);
-                }
-            }
+        'sports',
 
-            DB::commit();
-            
-            return response()->json([
-                'success' => true,
-                'message' => 'Location updated successfully',
-                'data' => $flyingLocation->load(['sports', 'clearanceStatuses'])
-            ]);
-            
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to update location',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        'qrCode',
+
+        'clearanceStatuses' => function ($query) use ($date) {
+
+            $query
+                ->whereDate('permission_date', $date)
+                ->with('updatedBy')
+                ->latest();
+
+        },
+
+        'airspaceSessions' => function ($query) {
+
+            $query
+                ->where('status', 'active')
+                ->whereNull('checked_out_at')
+                ->where('expires_at', '>', now())
+                ->with('pilot')
+               ->orderByDesc('permission_date');
+
+        },
+
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'data' => $flyingLocation,
+    ]);
+}
+
+public function update(Request $request, FlyingLocation $flyingLocation)
+{
+    $validator = Validator::make($request->all(), [
+
+        'name' => 'sometimes|string|max:255',
+        'type' => 'sometimes|string',
+        'takeoff_kato' => 'nullable|string',
+        'takeoff_nazim' => 'nullable|string',
+        'landing_kato' => 'nullable|string',
+        'landing_nazim' => 'nullable|string',
+        'boundaries_kato' => 'nullable|array',
+        'boundaries_nazim' => 'nullable|array',
+        'max_altitude' => 'nullable|string',
+        'description' => 'nullable|string',
+        'sports' => 'nullable|array',
+        'sports.*' => 'exists:sports,id',
+        'is_enabled' => 'boolean',
+
+    ]);
+
+    if ($validator->fails()) {
+
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+
     }
 
+    $data = $validator->validated();
+
+    if (isset($data['name'])) {
+        $data['slug'] = Str::slug($data['name']);
+    }
+
+    DB::beginTransaction();
+
+    try {
+
+        $flyingLocation->update($data);
+
+        if (isset($data['sports'])) {
+            $flyingLocation->sports()->sync($data['sports']);
+        }
+
+        DB::commit();
+
+        $date = $request->input('date', today()->toDateString());
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Location updated successfully',
+            'data' => $flyingLocation->load([
+
+                'sports',
+
+                'qrCode',
+
+                'clearanceStatuses' => function ($query) use ($date) {
+
+                    $query
+                        ->whereDate('permission_date', $date)
+                        ->with('updatedBy')
+                        ->latest();
+
+                },
+
+            ])
+        ]);
+
+    } catch (\Exception $e) {
+
+        DB::rollBack();
+
+        return response()->json([
+            'success' => false,
+            'message' => $e->getMessage()
+        ], 500);
+
+    }
+}
     public function destroy(FlyingLocation $flyingLocation)
     {
         DB::beginTransaction();
@@ -310,31 +384,61 @@ class FlyingLocationController extends Controller
         ]);
     }
 
-    public function statistics()
-    {
-        $totalLocations = FlyingLocation::count();
-        $enabledLocations = FlyingLocation::where('is_enabled', true)->count();
-        $locationsWithQR = FlyingLocation::has('qrCode')->count();
-        
-        $statusDistribution = DB::table('clearance_statuses')
-            ->select('status', DB::raw('COUNT(DISTINCT flying_location_id) as count'))
-            ->whereIn('id', function($query) {
-                $query->select(DB::raw('MAX(id)'))
-                    ->from('clearance_statuses')
-                    ->groupBy('flying_location_id');
-            })
-            ->groupBy('status')
-            ->pluck('count', 'status')
-            ->toArray();
+public function statistics(Request $request)
+{
+    $date = $request->input(
+        'date',
+        today()->toDateString()
+    );
 
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'total_locations' => $totalLocations,
-                'enabled_locations' => $enabledLocations,
-                'locations_with_qr' => $locationsWithQR,
-                'status_distribution' => $statusDistribution
-            ]
-        ]);
-    }
+    $totalLocations = FlyingLocation::count();
+
+    $enabledLocations = FlyingLocation::where(
+        'is_enabled',
+        true
+    )->count();
+
+    $locationsWithQR = FlyingLocation::has('qrCode')->count();
+
+    $statusDistribution = DB::table('clearance_statuses')
+        ->select(
+            'status',
+            DB::raw('COUNT(*) as count')
+        )
+        ->whereDate(
+            'permission_date',
+            $date
+        )
+        ->groupBy('status')
+        ->pluck('count', 'status')
+        ->toArray();
+
+    return response()->json([
+
+        'success' => true,
+
+        'date' => $date,
+
+        'data' => [
+
+            'total_locations' => $totalLocations,
+
+            'enabled_locations' => $enabledLocations,
+
+            'locations_with_qr' => $locationsWithQR,
+
+            'status_distribution' => [
+
+                'green' => $statusDistribution['green'] ?? 0,
+
+                'yellow' => $statusDistribution['yellow'] ?? 0,
+
+                'red' => $statusDistribution['red'] ?? 0,
+
+            ],
+
+        ],
+
+    ]);
+}
 }
