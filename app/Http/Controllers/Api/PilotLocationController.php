@@ -40,12 +40,7 @@ class PilotLocationController extends Controller
 
     if (!$session) {
 
-        $crossCountrySession = CrossCountrySession::where(
-            'pilot_id',
-            auth()->id()
-        )
-        ->where('is_active', true)
-        ->first();
+   $crossCountrySession = null;
 
     }
 
@@ -169,46 +164,44 @@ public function liveAll()
     |--------------------------------------------------------------------------
     */
 
-    $crossCountrySessions = CrossCountrySession::with([
+    // $crossCountrySessions = CrossCountrySession::with([
 
-        'pilot',
+    //     'pilot',
 
-        'currentLocation',
+    //     'currentLocation',
 
-        'locations' => function ($q) {
+    //     'locations' => function ($q) {
 
-            $q->latest()->limit(1);
+    //         $q->latest()->limit(1);
 
-        },
+    //     },
 
-    ])
-    ->where('is_active', true)
-    ->get()
-    ->map(function ($session) {
+    // ])
+    // ->where('is_active', true)
+    // ->get()
+    // ->map(function ($session) {
 
-        return [
+    //     return [
 
-            'id' => $session->id,
+    //         'id' => $session->id,
 
-            'type' => 'cross_country',
+    //         'type' => 'cross_country',
 
-            'pilot' => $session->pilot,
+    //         'pilot' => $session->pilot,
 
-            'location' => $session->currentLocation,
+    //         'location' => $session->currentLocation,
 
-            'gps' => $session->locations->first(),
+    //         'gps' => $session->locations->first(),
 
-            'started_at' => $session->started_at,
+    //         'started_at' => $session->started_at,
 
-        ];
+    //     ];
 
-    });
+    // });
 
     return response()->json(
 
-        $airspaceSessions
-            ->concat($crossCountrySessions)
-            ->values()
+     $airspaceSessions->values()
 
     );
 }
@@ -267,49 +260,45 @@ public function live($locationId)
     |--------------------------------------------------------------------------
     */
 
-    $crossCountrySessions = CrossCountrySession::with([
+    // $crossCountrySessions = CrossCountrySession::with([
 
-        'pilot',
+    //     'pilot',
 
-        'currentLocation',
+    //     'currentLocation',
 
-        'locations' => function ($q) {
+    //     'locations' => function ($q) {
 
-            $q->latest()->limit(1);
+    //         $q->latest()->limit(1);
 
-        },
+    //     },
 
-    ])
-    ->where('current_location_id', $locationId)
-    ->where('is_active', true)
-    ->get()
-    ->map(function ($session) {
+    // ])
+    // ->where('current_location_id', $locationId)
+    // ->where('is_active', true)
+    // ->get()
+    // ->map(function ($session) {
 
-        return [
+    //     return [
 
-            'id' => $session->id,
+    //         'id' => $session->id,
 
-            'type' => 'cross_country',
+    //         'type' => 'cross_country',
 
-            'pilot' => $session->pilot,
+    //         'pilot' => $session->pilot,
 
-            'location' => $session->currentLocation,
+    //         'location' => $session->currentLocation,
 
-            'gps' => $session->locations->first(),
+    //         'gps' => $session->locations->first(),
 
-            'started_at' => $session->started_at,
+    //         'started_at' => $session->started_at,
 
-        ];
+    //     ];
 
-    });
+    // });
 
-    return response()->json(
-
-        $airspaceSessions
-            ->concat($crossCountrySessions)
-            ->values()
-
-    );
+return response()->json(
+    $airspaceSessions->values()
+);
 }
 private function findCurrentFlyingLocation(
     float $latitude,
