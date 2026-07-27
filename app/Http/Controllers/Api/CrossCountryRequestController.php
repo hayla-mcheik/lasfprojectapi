@@ -23,10 +23,25 @@ public function index(Request $request)
 {
     $requests = CrossCountryRequest::with([
 
+        'pilot',
+
         'locations.location',
+
+        'qrCode',
+
+        'session.currentLocation',
+
+        'activeSession.currentLocation',
 
     ])
     ->where('pilot_id', $request->user()->id)
+    ->whereIn('status', [
+
+        'pending',
+
+        'open',
+
+    ])
     ->latest()
     ->get();
 
@@ -215,6 +230,12 @@ $requests = CrossCountryRequest::with([
 
     'locations.location',
 
+    'session.currentLocation',
+
+    'activeSession.currentLocation',
+
+    'qrCode',
+
 ])
 ->latest()
 ->get();
@@ -305,7 +326,6 @@ if (
     ]);
 
 }
-
 $crossCountryRequest->load([
 
     'pilot',
@@ -313,6 +333,10 @@ $crossCountryRequest->load([
     'locations.location',
 
     'qrCode',
+
+    'session.currentLocation',
+
+    'activeSession.currentLocation',
 
 ]);
 

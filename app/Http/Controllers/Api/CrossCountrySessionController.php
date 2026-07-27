@@ -81,19 +81,19 @@ if ($activeSession) {
     |--------------------------------------------------------------------------
     */
 
-    $activeAirspace = AirspaceSession::where('pilot_id', $pilot->id)
-        ->where('status', 'active')
-        ->whereNull('checked_out_at')
-        ->where('expires_at', '>', now())
-        ->exists();
+$activeAirspace = AirspaceSession::where('pilot_id', $pilot->id)
+    ->where('status', 'active')
+    ->whereNull('checked_out_at')
+    ->where('expires_at', '>', now())
+    ->first();
 
-    if ($activeAirspace) {
+if (!$activeAirspace) {
 
-        return response()->json([
-            'message' => 'Please finish your current Airspace session first.'
-        ], 422);
+    return response()->json([
+        'message' => 'You must check in to a flying location before starting a Cross Country flight.'
+    ], 422);
 
-    }
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -126,26 +126,44 @@ if ($activeSession) {
 
         'pilot_id' => $pilot->id,
 
-        'current_location_id' => $firstLocation->flying_location_id,
-
+'current_location_id' => $activeAirspace->flying_location_id,
         'started_at' => now(),
 
         'is_active' => true,
 
     ]);
+$crossCountryRequest->refresh();
 
-    return response()->json([
-
-        'message' => 'Cross Country session started successfully.',
-
-        'session' => $session->load([
-            'currentLocation',
-            'request.locations.location',
-        ]),
-
-    ], 201);
+$crossCountryRequest->load([
+    'locations.location',
+    'session.currentLocation',
+    'activeSession.currentLocation',
+]);
+return response()->json([
+    'message' => 'Cross Country session started successfully.',
+    'session' => $session->load([
+        'currentLocation',
+        'request.locations.location',
+    ]),
+    'request' => $crossCountryRequest,
+], 201);
 }
 
+public function active(Request $request)
+{
+    $session = CrossCountrySession::with([
+        'currentLocation',
+        'request.locations.location',
+        'request.qrCode',
+    ])
+    ->where('pilot_id', $request->user()->id)
+    ->where('is_active', true)
+    ->first();
+
+    return response()->json([
+        'session' => $session,
+    ]);
+}
 public function finish(
     Request $request,
     CrossCountrySession $crossCountrySession

@@ -71,19 +71,5 @@ class CrossCountrySession extends Model
         'cross_country_session_id'
     );
 }
-public function active(Request $request)
-{
-    $session = CrossCountrySession::with([
-        'currentLocation',
-        'request.locations.location',
-        'request.qrCode',
-    ])
-    ->where('pilot_id', $request->user()->id)
-    ->where('is_active', true)
-    ->first();
 
-    return response()->json([
-        'session' => $session,
-    ]);
-}
 }
