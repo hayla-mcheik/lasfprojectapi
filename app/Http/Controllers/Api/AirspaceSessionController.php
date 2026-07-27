@@ -152,6 +152,10 @@ public function qr($token)
      */
     public function store(Request $request)
     {
+        Log::info('STORE AIRSPACE SESSION CALLED', [
+    'user_id' => optional($request->user())->id,
+    'token' => $request->token,
+]);
         /*
         |--------------------------------------------------------------------------
         | Validate Request
