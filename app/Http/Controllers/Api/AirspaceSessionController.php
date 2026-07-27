@@ -654,7 +654,10 @@ if ($pilot->pilotProfile->isCurrentlyBanned()) {
 
             ->first();
 
-
+Log::info('ACTIVE SESSION API', [
+    'user_id' => $request->user()->id,
+    'session' => $session,
+]);
         return response()->json($session);
     }
 
