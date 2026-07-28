@@ -258,17 +258,13 @@ public function adminShow(Request $request, CrossCountryRequest $crossCountryReq
 
     }
 
-    $crossCountryRequest->load([
-
-        'pilot.pilotProfile',
-
-        'locations.location',
-
-        'qrCode',
-
-        'session.currentLocation',
-
-    ]);
+$crossCountryRequest->load([
+    'pilot.pilotProfile',
+    'locations.location',
+    'qrCode',
+    'session.currentLocation',
+    'activeSession.currentLocation',
+]);
 
     return response()->json([
         'request' => $crossCountryRequest,
