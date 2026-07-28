@@ -664,6 +664,10 @@ Log::info('ACTIVE SESSION API CALLED', [
     'session_id' => optional($session)->id,
     'location_id' => optional($session)->flying_location_id,
 ]);
+Log::info('ACTIVE SESSION RESULT', [
+    'session' => $session,
+    'is_null' => is_null($session),
+]);
         return response()->json($session);
     }
 
