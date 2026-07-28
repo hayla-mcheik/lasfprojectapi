@@ -85,14 +85,13 @@ public function register(Request $request)
             'ratings' => 'required|array',
             'disciplines' => 'required|array',
 
-            'date_of_birth' => 'required|date|before:today',
+            'date_of_birth' => 'nullable|date|before:today',
 
             'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
             'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
         ], [
             'email.unique' => 'This email is already registered.',
             'password.confirmed' => 'Password confirmation does not match.',
-            'date_of_birth.required' => 'Date of birth is required.',
             'date_of_birth.before' => 'Date of birth must be before today.',
             'ratings.required' => 'Please select at least one rating.',
             'disciplines.required' => 'Please select at least one discipline.',
@@ -278,7 +277,7 @@ public function updateMembership(Request $request)
     $request->validate([
         'name' => 'required|string|max:255',
         'phone' => 'required|string|max:20',
- 'date_of_birth' => 'required|date|before:today',
+ 'date_of_birth' => 'nullable|date|before:today',
         'blood_type' => 'required',
         'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
         'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
