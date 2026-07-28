@@ -56,7 +56,8 @@ use App\Http\Controllers\Api\Admin\WeatherController as AdminWeatherController;
 use App\Http\Controllers\Api\Admin\PilotSafetyMessageController as AdminPilotSafetyMessageController;
 use App\Http\Controllers\Api\CrossCountryRequestController;
 use App\Http\Controllers\Api\CrossCountrySessionController;
-
+use App\Http\Controllers\Api\FeedbackController;
+use App\Http\Controllers\Api\Admin\FeedbackController as AdminFeedbackController;
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTES
@@ -587,6 +588,20 @@ Route::middleware([
             'destroy',
         ]);
 
+Route::get('/feedback', [
+    AdminFeedbackController::class,
+    'index',
+]);
+
+Route::get('/feedback/{feedback}', [
+    AdminFeedbackController::class,
+    'show',
+]);
+
+Route::patch('/feedback/{feedback}', [
+    AdminFeedbackController::class,
+    'update',
+]);
 
         /*
         |--------------------------------------------------------------------------
@@ -995,3 +1010,4 @@ Route::get(
             'logout',
         ]);
     });
+    Route::post('/feedback', [FeedbackController::class, 'store']);
