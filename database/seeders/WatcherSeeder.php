@@ -18,7 +18,7 @@ class WatcherSeeder extends Seeder
         [
             'name' => 'LASF Watcher',
             'phone' => '03123456',
-            'password' => Hash::make('password'),
+            'password' => Hash::make('Watcher123!'),
 
             'role' => 'watcher',
 
