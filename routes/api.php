@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ContactMessageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +59,8 @@ use App\Http\Controllers\Api\CrossCountryRequestController;
 use App\Http\Controllers\Api\CrossCountrySessionController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\Admin\FeedbackController as AdminFeedbackController;
+use App\Http\Controllers\Api\ContactController;
+
 /*
 |--------------------------------------------------------------------------
 | PUBLIC ROUTES
@@ -744,6 +747,10 @@ Route::patch('/feedback/{feedback}', [
         |--------------------------------------------------------------------------
         */
 
+            Route::get('/contact-messages', [ContactMessageController::class, 'index']);
+    Route::get('/contact-messages/{contactMessage}', [ContactMessageController::class, 'show']);
+    Route::delete('/contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
+
         Route::apiResource(
             'destinations',
             AdminDestinationController::class
@@ -1011,3 +1018,4 @@ Route::get(
         ]);
     });
     Route::post('/feedback', [FeedbackController::class, 'store']);
+    Route::post('/contact', [ContactController::class, 'store']);

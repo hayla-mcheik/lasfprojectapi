@@ -16,7 +16,7 @@ class WatcherSeeder extends Seeder
     User::firstOrCreate(
         ['email' => 'watcher@lasf.info'],
         [
-            'name' => 'LASF Watcher',
+            'name' => '',
             'phone' => '03123456',
             'password' => Hash::make('Watcher123!'),
 
@@ -24,7 +24,7 @@ class WatcherSeeder extends Seeder
 
             'is_admin' => false,
             'is_active' => true,
-            'is_approved' => true,
+            'is_approveLASF Watcherd' => true,
         ]
     );
 }
