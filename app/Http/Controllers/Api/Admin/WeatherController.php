@@ -30,11 +30,17 @@ class WeatherController extends Controller
     {
         $forecast = WeatherForecast::findOrFail($id);
 $request->validate([
+    'forecast_date' => 'required|date',
+    'general_situation_ar' => 'required|string',
+    'surface_winds_ar' => 'required|string',
+    'visibility_ar' => 'required|string',
+    'humidity_range' => 'required|string',
+    'sea_state_ar' => 'required|string',
+    'pressure_hpa' => 'required|string',
+    'water_temp_ar' => 'required|string',
 
-    'flyable_status' => 'nullable|in:good,caution,not_flyable',
-
-    'flyable_message' => 'nullable|string|max:255',
-
+    'flyable_status' => 'required|in:good,caution,not_flyable',
+    'flyable_message' => 'required|string|max:255',
 ]);
         return DB::transaction(function () use ($request, $forecast) {
             // Update main fields

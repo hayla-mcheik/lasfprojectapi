@@ -11,7 +11,7 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: '' 
+        // apiPrefix: '' 
     )
 ->withMiddleware(function (Middleware $middleware) {
 
@@ -32,6 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
 
         'pilot_view_access' =>
             \App\Http\Middleware\PilotViewAccess::class,
+        'beirut_airport' =>
+        \App\Http\Middleware\BeirutAirportAccess::class,
+
 
     ]);
 

@@ -648,23 +648,6 @@ Route::patch('/feedback/{feedback}', [
         );
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | WEATHER
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get('weather', [
-            AdminWeatherController::class,
-            'index',
-        ]);
-
-
-        Route::put('weather/{id}', [
-            AdminWeatherController::class,
-            'update',
-        ]);
-
 
         /*
         |--------------------------------------------------------------------------
@@ -842,6 +825,25 @@ Route::patch('/feedback/{feedback}', [
         );
     });
 
+
+    Route::middleware([
+    'auth:sanctum',
+    'beirut_airport',
+])
+->prefix('admin')
+->group(function () {
+
+    Route::get('weather', [
+        AdminWeatherController::class,
+        'index',
+    ]);
+
+    Route::put('weather/{id}', [
+        AdminWeatherController::class,
+        'update',
+    ]);
+
+});
 
 /*
 |--------------------------------------------------------------------------

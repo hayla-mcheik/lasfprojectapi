@@ -55,7 +55,11 @@ class User extends Authenticatable
     {
         return $this->role === 'watcher';
     }
-
+     
+    public function isBeirutAirport()
+{
+    return $this->role === 'beirut_airport';
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -72,7 +76,8 @@ class User extends Authenticatable
     {
         return $this->isAdmin()
             || $this->isArmy()
-            || $this->isWatcher();
+            || $this->isWatcher() 
+            || $this->role === 'beirut_airport';
     }
 
 
@@ -82,10 +87,12 @@ class User extends Authenticatable
     |--------------------------------------------------------------------------
     */
 
-    public function canViewLiveTracking(): bool
-    {
-        return $this->canAccessDashboard();
-    }
+  public function canViewLiveTracking(): bool
+{
+    return $this->isAdmin()
+        || $this->isArmy()
+        || $this->isWatcher();
+}
 
 
     /*
