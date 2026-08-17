@@ -9,7 +9,7 @@ use App\Models\FlyingLocation;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use App\Models\QRCode;
+use App\Models\CrossCountryQRCode;
 use Illuminate\Support\Str;
 class CrossCountryRequestController extends Controller
 {
@@ -311,13 +311,11 @@ if (
     !$crossCountryRequest->qrCode
 ) {
 
-    QRCode::create([
-
-        'token' => (string) Str::uuid(),
-
-        'type' => 'cross_country',
+    CrossCountryQRCode::create([
 
         'cross_country_request_id' => $crossCountryRequest->id,
+
+        'token' => (string) Str::uuid(),
 
     ]);
 

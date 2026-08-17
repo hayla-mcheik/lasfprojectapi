@@ -58,27 +58,39 @@ class PilotLocationController extends Controller
 
     }
 
+$isOutsideZone = false;
+
+if ($session) {
+
+    $allowedLocation = $this->findCurrentFlyingLocation(
+        $request->latitude,
+        $request->longitude
+    );
+
+    if (
+        !$allowedLocation
+        ||
+        $allowedLocation->id !== $session->flying_location_id
+    ) {
+        $isOutsideZone = true;
+    }
+}
+
     /*
     |--------------------------------------------------------------------------
     | Save GPS
     |--------------------------------------------------------------------------
     */
 
-    $location = PilotLocation::create([
-
-        'pilot_id' => auth()->id(),
-
-        'airspace_session_id' => $session?->id,
-
-        'cross_country_session_id' => $crossCountrySession?->id,
-
-        'latitude' => $request->latitude,
-
-        'longitude' => $request->longitude,
-
-        'accuracy' => $request->accuracy,
-
-    ]);
+$location = PilotLocation::create([
+    'pilot_id' => auth()->id(),
+    'airspace_session_id' => $session?->id,
+    'cross_country_session_id' => $crossCountrySession?->id,
+    'latitude' => $request->latitude,
+    'longitude' => $request->longitude,
+    'accuracy' => $request->accuracy,
+    'is_outside_zone' => $isOutsideZone,
+]);
 
     /*
 |--------------------------------------------------------------------------
@@ -107,7 +119,13 @@ if ($crossCountrySession) {
     }
 
 }
-    return response()->json($location);
+return response()->json([
+    'location' => $location,
+    'outside_zone' => $isOutsideZone,
+    'message' => $isOutsideZone
+        ? 'You are outside the authorized flying zone.'
+        : null,
+]);
 }
 
     /**
@@ -115,12 +133,6 @@ if ($crossCountrySession) {
      */
 public function liveAll()
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Active Airspace Sessions
-    |--------------------------------------------------------------------------
-    */
-
     $airspaceSessions = AirspaceSession::with([
 
         'pilot',
@@ -140,6 +152,8 @@ public function liveAll()
     ->get()
     ->map(function ($session) {
 
+        $latestGps = $session->locations->first();
+
         return [
 
             'id' => $session->id,
@@ -150,7 +164,13 @@ public function liveAll()
 
             'location' => $session->location,
 
-            'gps' => $session->locations->first(),
+            'gps' => $latestGps,
+
+            'outside_zone' => $latestGps?->is_outside_zone ?? false,
+
+            'warning' => $latestGps?->is_outside_zone
+                ? 'Pilot is outside the authorized flying zone.'
+                : null,
 
             'started_at' => $session->checked_in_at,
 
@@ -158,51 +178,8 @@ public function liveAll()
 
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Active Cross Country Sessions
-    |--------------------------------------------------------------------------
-    */
-
-    // $crossCountrySessions = CrossCountrySession::with([
-
-    //     'pilot',
-
-    //     'currentLocation',
-
-    //     'locations' => function ($q) {
-
-    //         $q->latest()->limit(1);
-
-    //     },
-
-    // ])
-    // ->where('is_active', true)
-    // ->get()
-    // ->map(function ($session) {
-
-    //     return [
-
-    //         'id' => $session->id,
-
-    //         'type' => 'cross_country',
-
-    //         'pilot' => $session->pilot,
-
-    //         'location' => $session->currentLocation,
-
-    //         'gps' => $session->locations->first(),
-
-    //         'started_at' => $session->started_at,
-
-    //     ];
-
-    // });
-
     return response()->json(
-
-     $airspaceSessions->values()
-
+        $airspaceSessions->values()
     );
 }
     /**
@@ -210,12 +187,6 @@ public function liveAll()
      */
 public function live($locationId)
 {
-    /*
-    |--------------------------------------------------------------------------
-    | Airspace
-    |--------------------------------------------------------------------------
-    */
-
     $airspaceSessions = AirspaceSession::with([
 
         'pilot',
@@ -236,6 +207,8 @@ public function live($locationId)
     ->get()
     ->map(function ($session) {
 
+        $latestGps = $session->locations->first();
+
         return [
 
             'id' => $session->id,
@@ -246,7 +219,13 @@ public function live($locationId)
 
             'location' => $session->location,
 
-            'gps' => $session->locations->first(),
+            'gps' => $latestGps,
+
+            'outside_zone' => $latestGps?->is_outside_zone ?? false,
+
+            'warning' => $latestGps?->is_outside_zone
+                ? 'Pilot is outside the authorized flying zone.'
+                : null,
 
             'started_at' => $session->checked_in_at,
 
@@ -254,89 +233,39 @@ public function live($locationId)
 
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Cross Country
-    |--------------------------------------------------------------------------
-    */
-
-    // $crossCountrySessions = CrossCountrySession::with([
-
-    //     'pilot',
-
-    //     'currentLocation',
-
-    //     'locations' => function ($q) {
-
-    //         $q->latest()->limit(1);
-
-    //     },
-
-    // ])
-    // ->where('current_location_id', $locationId)
-    // ->where('is_active', true)
-    // ->get()
-    // ->map(function ($session) {
-
-    //     return [
-
-    //         'id' => $session->id,
-
-    //         'type' => 'cross_country',
-
-    //         'pilot' => $session->pilot,
-
-    //         'location' => $session->currentLocation,
-
-    //         'gps' => $session->locations->first(),
-
-    //         'started_at' => $session->started_at,
-
-    //     ];
-
-    // });
-
-return response()->json(
-    $airspaceSessions->values()
-);
+    return response()->json(
+        $airspaceSessions->values()
+    );
 }
+
 private function findCurrentFlyingLocation(
     float $latitude,
     float $longitude
 ): ?FlyingLocation
 {
-    $nearest = null;
+    foreach (FlyingLocation::whereNotNull('kml_polygon')->get() as $location) {
 
-    $nearestDistance = PHP_FLOAT_MAX;
+        $polygons = $location->kml_polygon;
 
-    foreach (FlyingLocation::all() as $location) {
-
-        $distance = $this->distance(
-
-            $latitude,
-            $longitude,
-
-            $location->latitude,
-            $location->longitude
-
-        );
-
-        if ($distance < $nearestDistance) {
-
-            $nearestDistance = $distance;
-
-            $nearest = $location;
-
+        if (!is_array($polygons)) {
+            continue;
         }
 
+        foreach ($polygons as $polygon) {
+
+            if (
+                $this->pointInPolygon(
+                    $latitude,
+                    $longitude,
+                    $polygon
+                )
+            ) {
+                return $location;
+            }
+        }
     }
 
-    // Only consider locations within 5 km
-    if ($nearestDistance > 5) {
-        return null;
-    }
-
-    return $nearest;
+    return null;
 }
 private function distance(
     float $lat1,
@@ -373,30 +302,44 @@ private function pointInPolygon(
 {
     $inside = false;
 
-    $count = count($polygon);
+    $vertices = count($polygon);
 
-    if ($count < 3) {
+    if ($vertices < 3) {
         return false;
     }
 
-    for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
+    for (
+        $i = 0, $j = $vertices - 1;
+        $i < $vertices;
+        $j = $i++
+    ) {
 
-        $latI = $polygon[$i]['lat'];
-        $lngI = $polygon[$i]['lng'];
+        $xi = $polygon[$i]['lng'];
+        $yi = $polygon[$i]['lat'];
 
-        $latJ = $polygon[$j]['lat'];
-        $lngJ = $polygon[$j]['lng'];
+        $xj = $polygon[$j]['lng'];
+        $yj = $polygon[$j]['lat'];
 
-        if (
-            (($lngI > $longitude) != ($lngJ > $longitude)) &&
+        $intersect =
             (
-                $latitude <
-                ($latJ - $latI) *
-                ($longitude - $lngI) /
-                (($lngJ - $lngI) ?: 0.0000001)
-                + $latI
+                ($yi > $latitude)
+                !==
+                ($yj > $latitude)
             )
-        ) {
+            &&
+            (
+                $longitude
+                <
+                ($xj - $xi)
+                *
+                ($latitude - $yi)
+                /
+                ($yj - $yi)
+                +
+                $xi
+            );
+
+        if ($intersect) {
             $inside = !$inside;
         }
     }

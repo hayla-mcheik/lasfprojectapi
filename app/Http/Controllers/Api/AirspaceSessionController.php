@@ -9,6 +9,7 @@ use App\Models\QRCode;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use App\Models\CrossCountryRequest;
+use App\Models\CrossCountryQRCode;
 class AirspaceSessionController extends Controller
 {
     /**
@@ -74,34 +75,25 @@ class AirspaceSessionController extends Controller
  */
 public function qr($token)
 {
-    $qr = QRCode::with([
-        'location',
-        'crossCountryRequest.locations.location',
-    ])->where('token', $token)->first();
-
-    if (!$qr) {
-
-        return response()->json([
-            'message' => 'Invalid QR Code.',
-        ], 404);
-
-    }
-
     /*
     |--------------------------------------------------------------------------
     | Airspace QR
     |--------------------------------------------------------------------------
     */
 
-    if ($qr->type === 'airspace') {
+    $airspaceQR = QRCode::with('location')
+        ->where('token', $token)
+        ->first();
+
+    if ($airspaceQR) {
 
         return response()->json([
 
             'type' => 'airspace',
 
-            'token' => $qr->token,
+            'token' => $airspaceQR->token,
 
-            'location' => $qr->location,
+            'location' => $airspaceQR->location,
 
         ]);
 
@@ -113,15 +105,21 @@ public function qr($token)
     |--------------------------------------------------------------------------
     */
 
-    if ($qr->type === 'cross_country') {
+    $crossCountryQR = CrossCountryQRCode::with([
+        'crossCountryRequest.locations.location',
+    ])
+    ->where('token', $token)
+    ->first();
+
+    if ($crossCountryQR) {
 
         return response()->json([
 
             'type' => 'cross_country',
 
-            'token' => $qr->token,
+            'token' => $crossCountryQR->token,
 
-            'request' => $qr->crossCountryRequest,
+            'request' => $crossCountryQR->crossCountryRequest,
 
         ]);
 
@@ -129,11 +127,10 @@ public function qr($token)
 
     return response()->json([
 
-        'message' => 'Unknown QR type.',
+        'message' => 'Invalid QR Code.',
 
-    ], 422);
+    ], 404);
 }
-
 
     /**
      * PRIVATE:
@@ -571,7 +568,7 @@ if ($pilot->pilotProfile->isCurrentlyBanned()) {
                 null,
 
             'expires_at' =>
-                now()->addHours(3),
+                now()->addHours(7),
 
             'status' =>
                 'active',
@@ -671,6 +668,48 @@ Log::info('ACTIVE SESSION RESULT', [
         return response()->json($session);
     }
 
+ public function pause(
+    Request $request,
+    AirspaceSession $airspaceSession
+) {
+    if (
+        $airspaceSession->pilot_id != $request->user()->id
+    ) {
+        return response()->json([
+            'message' => 'Unauthorized.'
+        ], 403);
+    }
+
+    $airspaceSession->update([
+        'status' => 'paused'
+    ]);
+
+    return response()->json([
+        'message' => 'Permission paused successfully.',
+        'session' => $airspaceSession
+    ]);
+}
+public function resume(
+    Request $request,
+    AirspaceSession $airspaceSession
+) {
+    if (
+        $airspaceSession->pilot_id != $request->user()->id
+    ) {
+        return response()->json([
+            'message' => 'Unauthorized.'
+        ], 403);
+    }
+
+    $airspaceSession->update([
+        'status' => 'active'
+    ]);
+
+    return response()->json([
+        'message' => 'Permission resumed successfully.',
+        'session' => $airspaceSession
+    ]);
+}
 
     /**
      * PRIVATE:

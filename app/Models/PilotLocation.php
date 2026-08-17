@@ -11,16 +11,17 @@ class PilotLocation extends Model
         'airspace_session_id',
         'latitude',
         'longitude',
-        'accuracy'
+        'accuracy',
+        'is_outside_zone',
     ];
 
-    public function pilot()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function session()
-    {
-        return $this->belongsTo(AirspaceSession::class);
-    }
+public function pilot()
+{
+    return $this->belongsTo(User::class, 'pilot_id');
+}
+    
+public function session()
+{
+    return $this->belongsTo(AirspaceSession::class, 'airspace_session_id');
+}
 }

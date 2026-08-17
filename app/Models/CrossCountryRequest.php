@@ -110,7 +110,7 @@ public function session()
 public function qrCode()
 {
     return $this->hasOne(
-        QRCode::class,
+        CrossCountryQRCode::class,
         'cross_country_request_id'
     );
 }

@@ -18,6 +18,7 @@ class FlyingLocation extends Model
         'landing_nazim',
         'boundaries_kato',
         'boundaries_nazim',
+        'kml_polygon',
         'max_altitude',
         'map_image',
         'is_enabled',
@@ -26,6 +27,7 @@ class FlyingLocation extends Model
     protected $casts = [
         'boundaries_kato' => 'array',
         'boundaries_nazim' => 'array',
+        'kml_polygon' => 'array',
         'is_enabled' => 'boolean',
     ];
 
@@ -65,33 +67,29 @@ public function getStatusLabelAttribute(): string
     |--------------------------------------------------------------------------
     */
 
-    public function getLatitudeAttribute(): float
-    {
-        $bounds = $this->boundaries_kato;
-
-        if (
-            is_array($bounds)
-            && isset($bounds[0]['lat'])
-        ) {
-            return (float) $bounds[0]['lat'];
-        }
-
-        return 33.5 + ($this->id * 0.05);
+public function getLatitudeAttribute(): float
+{
+    if (
+        is_array($this->kml_polygon)
+        && isset($this->kml_polygon[0][0]['lat'])
+    ) {
+        return (float) $this->kml_polygon[0][0]['lat'];
     }
 
-    public function getLongitudeAttribute(): float
-    {
-        $bounds = $this->boundaries_kato;
+    return 0;
+}
 
-        if (
-            is_array($bounds)
-            && isset($bounds[0]['lng'])
-        ) {
-            return (float) $bounds[0]['lng'];
-        }
-
-        return 35.2 + ($this->id * 0.05);
+public function getLongitudeAttribute(): float
+{
+    if (
+        is_array($this->kml_polygon)
+        && isset($this->kml_polygon[0][0]['lng'])
+    ) {
+        return (float) $this->kml_polygon[0][0]['lng'];
     }
+
+    return 0;
+}
 
     /*
     |--------------------------------------------------------------------------

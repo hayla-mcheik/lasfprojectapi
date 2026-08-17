@@ -60,6 +60,8 @@ use App\Http\Controllers\Api\CrossCountrySessionController;
 use App\Http\Controllers\Api\FeedbackController;
 use App\Http\Controllers\Api\Admin\FeedbackController as AdminFeedbackController;
 use App\Http\Controllers\Api\ContactController;
+use App\Http\Controllers\Api\Admin\CrossCountryQRCodeController;
+use App\Http\Controllers\CrossCountryCardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -354,6 +356,48 @@ Route::middleware([
                 'regions',
             ]
         );
+               /*
+        |--------------------------------------------------------------------------
+        | DAILY CLEARANCE MANAGEMENT
+        |--------------------------------------------------------------------------
+        */
+
+        Route::post(
+            'clearance-statuses',
+            [
+                AdminClearanceStatusController::class,
+                'store',
+            ]
+        );
+
+
+        Route::put(
+            'clearance-statuses/{clearanceStatus}',
+            [
+                AdminClearanceStatusController::class,
+                'update',
+            ]
+        );
+
+
+        Route::patch(
+            'clearance-statuses/{clearanceStatus}',
+            [
+                AdminClearanceStatusController::class,
+                'update',
+            ]
+        );
+
+
+        Route::delete(
+            'clearance-statuses/{clearanceStatus}',
+            [
+                AdminClearanceStatusController::class,
+                'destroy',
+            ]
+        );
+
+
 
 
         Route::post(
@@ -606,48 +650,6 @@ Route::patch('/feedback/{feedback}', [
     'update',
 ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | DAILY CLEARANCE MANAGEMENT
-        |--------------------------------------------------------------------------
-        */
-
-        Route::post(
-            'clearance-statuses',
-            [
-                AdminClearanceStatusController::class,
-                'store',
-            ]
-        );
-
-
-        Route::put(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'update',
-            ]
-        );
-
-
-        Route::patch(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'update',
-            ]
-        );
-
-
-        Route::delete(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'destroy',
-            ]
-        );
-
-
 
         /*
         |--------------------------------------------------------------------------
@@ -889,6 +891,7 @@ Route::patch(
     '/admin/cross-country-requests/{crossCountryRequest}/status',
     [CrossCountryRequestController::class, 'updateStatus']
 );
+
 Route::get(
     '/cross-country/history',
     [CrossCountryRequestController::class, 'history']
@@ -918,6 +921,17 @@ Route::get(
     [CrossCountrySessionController::class, 'active']
 );
 
+
+Route::post(
+    '/admin/cross-country-requests/{crossCountryRequest}/generate-qr',
+    [CrossCountryQRCodeController::class, 'generateQR']
+);
+
+Route::get(
+    '/admin/cross-country-requests/{crossCountryRequest}/qr',
+    [CrossCountryQRCodeController::class, 'getQRCode']
+);
+Route::get('/cross-country-card/{id}', [CrossCountryCardController::class, 'generate']);
         /*
         |--------------------------------------------------------------------------
         | MEMBERSHIP CARD
@@ -998,6 +1012,21 @@ Route::get(
             ]
         );
 
+        Route::patch(
+    'airspace-sessions/{session}/pause',
+    [
+        AirspaceSessionController::class,
+        'pause'
+    ]
+);
+
+Route::patch(
+    'airspace-sessions/{session}/resume',
+    [
+        AirspaceSessionController::class,
+        'resume'
+    ]
+);
 
         Route::post(
             '/airspace-sessions/{id}/checkout',
