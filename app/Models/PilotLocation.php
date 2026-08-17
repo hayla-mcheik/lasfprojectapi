@@ -20,8 +20,8 @@ public function pilot()
     return $this->belongsTo(User::class, 'pilot_id');
 }
     
-public function session()
-{
-    return $this->belongsTo(AirspaceSession::class, 'airspace_session_id');
-}
+    public function session()
+    {
+        return $this->belongsTo(AirspaceSession::class);
+    }
 }
