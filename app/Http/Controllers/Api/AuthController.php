@@ -120,16 +120,29 @@ public function register(Request $request)
             'is_active' => false,
             'is_approved' => false,
         ]);
+$currentYear = now()->format('y');
 
-        $currentYear = now()->format('y');
+$clubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT);
 
-        $clubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT);
+$lastLicense = PilotProfile::where('club_code', $clubCode)
+    ->where('license_number', 'like', $currentYear . '-' . $clubCode . '-%')
+    ->orderBy('id', 'desc')
+    ->value('license_number');
 
-        $count = PilotProfile::where('club_code', $clubCode)->count();
+if ($lastLicense) {
 
-        $sequence = str_pad($count + 1, 4, '0', STR_PAD_LEFT);
+    $parts = explode('-', $lastLicense);
 
-        $licenseNumber = "{$currentYear}-{$clubCode}-{$sequence}";
+    $lastSequence = (int) $parts[2];
+
+    $sequence = str_pad($lastSequence + 1, 4, '0', STR_PAD_LEFT);
+
+} else {
+
+    $sequence = '0001';
+}
+
+$licenseNumber = "{$currentYear}-{$clubCode}-{$sequence}";
 
         $imagePath = null;
 
@@ -174,7 +187,9 @@ if ($request->hasFile('license_attachment')) {
             'valid_until' => now()->addYear(),
 
             'image' => $imagePath,
-            'licenses_attachments' => $licenseAttachment,
+          'licenses_attachments' => $licenseAttachment
+    ? [$licenseAttachment]
+    : null,
         ]);
 
         if ($request->disciplines) {
