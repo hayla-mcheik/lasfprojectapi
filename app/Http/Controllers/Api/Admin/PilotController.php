@@ -114,7 +114,12 @@ class PilotController extends Controller
             $licenseAttachments = [];
             if ($request->hasFile('licenses')) {
                 foreach ($request->file('licenses') as $file) {
-                    $licenseAttachments[] = $file->store('pilots/licenses', 'public');
+                 $path = $file->store(
+    'pilots/licenses',
+    'public'
+);
+
+$licenseAttachments[] = '/storage/' . $path;
                 }
             }
 
@@ -253,25 +258,32 @@ $profileData = [
 
        if ($request->hasFile('licenses')) {
 
-    $existingFiles = $profile?->licenses_attachments ?? [];
+    // Delete old files
+    if (!empty($profile->licenses_attachments)) {
 
-    if (is_string($existingFiles)) {
-        $decoded = json_decode($existingFiles, true);
+  foreach ($profile->licenses_attachments as $oldFile) {
 
-        $existingFiles = is_array($decoded)
-            ? $decoded
-            : [$existingFiles];
-    }
+    $oldPath = str_replace('/storage/', '', $oldFile);
 
-    foreach ($request->file('licenses', []) as $file) {
-        $existingFiles[] = $file->store(
-            'pilots/licenses',
-            'public'
-        );
-    }
-
-    $profileData['licenses_attachments'] = $existingFiles;
+    Storage::disk('public')->delete($oldPath);
 }
+    }
+
+    $newFiles = [];
+
+    foreach ($request->file('licenses') as $file) {
+
+     $path = $file->store(
+    'pilots/licenses',
+    'public'
+);
+
+$newFiles[] = '/storage/' . $path;
+    }
+
+    $profileData['licenses_attachments'] = $newFiles;
+}
+
             // Updated method call to use camelCase relation builder: pilotProfile()
             $updatedProfile = $pilot->pilotProfile()->updateOrCreate(['user_id' => $pilot->id], $profileData);
             $updatedProfile->disciplines()->sync($request->disciplines);
