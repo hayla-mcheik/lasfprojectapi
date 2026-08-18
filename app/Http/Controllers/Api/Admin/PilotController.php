@@ -251,14 +251,27 @@ $profileData = [
                 $profileData['image'] = Storage::url($path);
             }
 
-            if ($request->hasFile('licenses')) {
-                $existingFiles = $profile?->licenses_attachments ?? [];
-                foreach ($request->file('licenses') as $file) {
-                    $existingFiles[] = $file->store('pilots/licenses', 'public');
-                }
-                $profileData['licenses_attachments'] = $existingFiles;
-            }
+       if ($request->hasFile('licenses')) {
 
+    $existingFiles = $profile?->licenses_attachments ?? [];
+
+    if (is_string($existingFiles)) {
+        $decoded = json_decode($existingFiles, true);
+
+        $existingFiles = is_array($decoded)
+            ? $decoded
+            : [$existingFiles];
+    }
+
+    foreach ($request->file('licenses', []) as $file) {
+        $existingFiles[] = $file->store(
+            'pilots/licenses',
+            'public'
+        );
+    }
+
+    $profileData['licenses_attachments'] = $existingFiles;
+}
             // Updated method call to use camelCase relation builder: pilotProfile()
             $updatedProfile = $pilot->pilotProfile()->updateOrCreate(['user_id' => $pilot->id], $profileData);
             $updatedProfile->disciplines()->sync($request->disciplines);
@@ -287,9 +300,17 @@ $profileData = [
                     Storage::disk('public')->delete($imagePath);
                 }
                 if (!empty($profile->licenses_attachments)) {
-                    foreach ($profile->licenses_attachments as $filePath) {
-                        Storage::disk('public')->delete($filePath);
-                    }
+                 $attachments = $profile->licenses_attachments;
+
+if (!is_array($attachments)) {
+    $attachments = $attachments
+        ? [$attachments]
+        : [];
+}
+
+foreach ($attachments as $filePath) {
+    Storage::disk('public')->delete($filePath);
+}
                 }
                 $profile->disciplines()->detach();
                 $profile->delete();
