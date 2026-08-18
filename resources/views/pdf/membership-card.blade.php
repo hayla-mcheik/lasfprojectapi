@@ -360,13 +360,20 @@ body{
 <div class="pilot-info">
     <div class="pilot-name">{{ $user->name }}</div>
 
-    <div class="pilot-discipline">
-        {{ $profile->disciplines->pluck('name')->implode(' | ') }}
-    </div>
+<div class="pilot-discipline">
+    {{
+        $profile->disciplines && $profile->disciplines->count()
+            ? $profile->disciplines->pluck('name')->implode(' | ')
+            : 'No Active Disciplines'
+    }}
+</div>
 
-    <div class="pilot-dob">
-        {{ \Carbon\Carbon::parse($profile->date_of_birth)->format('d/m/Y') }}
-    </div>
+<div class="pilot-dob">
+    {{ $profile->date_of_birth
+        ? \Carbon\Carbon::parse($profile->date_of_birth)->format('d/m/Y')
+        : ''
+    }}
+</div>
 </div>
 
         <!-- DETAILS TABLE -->
