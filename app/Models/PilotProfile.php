@@ -38,8 +38,6 @@ class PilotProfile extends Model
      */
 protected $casts = [
 
-    'ratings' => 'array',
-
     'disciplines' => 'array',
 
     'licenses_attachments' => 'array',
