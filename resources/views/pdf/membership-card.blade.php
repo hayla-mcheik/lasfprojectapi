@@ -31,7 +31,7 @@ body{
     position:relative;
 
     width:85.6mm;
-    height:53.98mm;
+    height:56.98mm;
 
     margin:35mm auto 0;
 
