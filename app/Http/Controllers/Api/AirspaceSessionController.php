@@ -670,54 +670,46 @@ Log::info('ACTIVE SESSION RESULT', [
 
 public function pause(
     Request $request,
-    AirspaceSession $airspaceSession
+    AirspaceSession $session
 ) {
-    Log::info('PAUSE BUTTON CLICKED', [
-        'authenticated_user_id' => optional($request->user())->id,
-        'session_id' => $airspaceSession->id,
-        'session_pilot_id' => $airspaceSession->pilot_id,
-        'token' => $request->bearerToken(),
+    \Log::info('PAUSE', [
+        'route_session_id' => $session->id,
+        'pilot_id' => $session->pilot_id,
+        'authenticated_user' => $request->user()->id,
     ]);
 
-    if ($airspaceSession->pilot_id != $request->user()->id) {
-
-        Log::info('PAUSE UNAUTHORIZED');
-
+    if ($session->pilot_id != $request->user()->id) {
         return response()->json([
             'message' => 'Unauthorized.'
         ], 403);
     }
 
-    $airspaceSession->update([
+    $session->update([
         'status' => 'paused'
     ]);
 
-    Log::info('PAUSE SUCCESS');
-
     return response()->json([
         'message' => 'Permission paused successfully.',
-        'session' => $airspaceSession
+        'session' => $session
     ]);
 }
 public function resume(
     Request $request,
-    AirspaceSession $airspaceSession
+    AirspaceSession $session
 ) {
-    if (
-        $airspaceSession->pilot_id != $request->user()->id
-    ) {
+    if ($session->pilot_id != $request->user()->id) {
         return response()->json([
             'message' => 'Unauthorized.'
         ], 403);
     }
 
-    $airspaceSession->update([
+    $session->update([
         'status' => 'active'
     ]);
 
     return response()->json([
         'message' => 'Permission resumed successfully.',
-        'session' => $airspaceSession
+        'session' => $session
     ]);
 }
 
