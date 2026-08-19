@@ -687,11 +687,24 @@ public function pause(
         'session' => $session
     ]);
 }
-public function resume(
-    Request $request,
-    AirspaceSession $session
-) {
+// In your AirspaceSessionController.php
+public function resume(Request $request, AirspaceSession $session)
+{
+    // Log everything
+    \Log::info('===== RESUME CALLED =====', [
+        'session_id' => $session->id,
+        'pilot_id' => $request->user()->id,
+        'method' => $request->method(),
+        'all_headers' => $request->headers->all(),
+        'session_status' => $session->status,
+    ]);
+
     if ($session->pilot_id != $request->user()->id) {
+        \Log::warning('RESUME UNAUTHORIZED', [
+            'session_pilot' => $session->pilot_id,
+            'request_user' => $request->user()->id,
+        ]);
+        
         return response()->json([
             'message' => 'Unauthorized.'
         ], 403);
@@ -699,6 +712,11 @@ public function resume(
 
     $session->update([
         'status' => 'active'
+    ]);
+
+    \Log::info('RESUME SUCCESS', [
+        'session_id' => $session->id,
+        'new_status' => $session->status,
     ]);
 
     return response()->json([
