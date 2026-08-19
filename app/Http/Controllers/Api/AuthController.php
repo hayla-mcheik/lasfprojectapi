@@ -314,24 +314,37 @@ public function updateMembership(Request $request)
         'date_of_birth' => $request->date_of_birth,
     ];
 
-    if ($request->hasFile('image')) {
-        if ($request->hasFile('license_attachment')) {
+    if ($request->hasFile('license_attachment')) {
+
+    if (!empty($user->pilotProfile->licenses_attachments)) {
+
+        foreach ($user->pilotProfile->licenses_attachments as $oldFile) {
+
+            Storage::disk('public')->delete(
+                str_replace('/storage/', '', $oldFile)
+            );
+        }
+    }
 
     $path = $request->file('license_attachment')->store(
         'pilots/licenses',
         'public'
     );
 
-    $profileData['licenses_attachments'] = '/storage/' . $path;
+    $profileData['licenses_attachments'] = [
+        '/storage/' . $path
+    ];
 }
 
-        $path = $request->file('image')->store(
-            'pilots/avatars',
-            'public'
-        );
+if ($request->hasFile('image')) {
 
-        $profileData['image'] = '/storage/' . $path;
-    }
+    $path = $request->file('image')->store(
+        'pilots/avatars',
+        'public'
+    );
+
+    $profileData['image'] = '/storage/' . $path;
+}
 
     $user->pilotProfile()->update($profileData);
 
