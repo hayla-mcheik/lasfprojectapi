@@ -668,13 +668,21 @@ Log::info('ACTIVE SESSION RESULT', [
         return response()->json($session);
     }
 
- public function pause(
+public function pause(
     Request $request,
     AirspaceSession $airspaceSession
 ) {
-    if (
-        $airspaceSession->pilot_id != $request->user()->id
-    ) {
+    Log::info('PAUSE BUTTON CLICKED', [
+        'authenticated_user_id' => optional($request->user())->id,
+        'session_id' => $airspaceSession->id,
+        'session_pilot_id' => $airspaceSession->pilot_id,
+        'token' => $request->bearerToken(),
+    ]);
+
+    if ($airspaceSession->pilot_id != $request->user()->id) {
+
+        Log::info('PAUSE UNAUTHORIZED');
+
         return response()->json([
             'message' => 'Unauthorized.'
         ], 403);
@@ -683,6 +691,8 @@ Log::info('ACTIVE SESSION RESULT', [
     $airspaceSession->update([
         'status' => 'paused'
     ]);
+
+    Log::info('PAUSE SUCCESS');
 
     return response()->json([
         'message' => 'Permission paused successfully.',
