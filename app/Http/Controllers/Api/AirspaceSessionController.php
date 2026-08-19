@@ -641,19 +641,13 @@ if ($pilot->pilotProfile->isCurrentlyBanned()) {
         |--------------------------------------------------------------------------
         */
 
-        $session = AirspaceSession::with('location')
-
-            ->where('pilot_id', $request->user()->id)
-
-            ->where('status', 'active')
-
-            ->whereNull('checked_out_at')
-
-            ->where('expires_at', '>', now())
-
-            ->latest('checked_in_at')
-
-            ->first();
+ $session = AirspaceSession::with('location')
+    ->where('pilot_id', $request->user()->id)
+    ->whereIn('status', ['active', 'paused'])
+    ->whereNull('checked_out_at')
+    ->where('expires_at', '>', now())
+    ->latest('checked_in_at')
+    ->first();
 
 
 Log::info('ACTIVE SESSION API CALLED', [
