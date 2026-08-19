@@ -50,7 +50,7 @@ class PilotController extends Controller
     'email' => 'required|email|unique:users,email',
     'phone' => 'nullable|string|max:20',
 
-    'date_of_birth' => 'required|date',
+    'date_of_birth' => 'nullable|date',
 
     'blood_type' => 'required|string|max:5',
 
@@ -179,7 +179,7 @@ $licenseAttachments[] = '/storage/' . $path;
             'image' => 'nullable|image|max:2048',
          'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
 
-'date_of_birth' => 'required|date',
+'date_of_birth' => 'nullable|date',
 
 // NEW
 'is_banned' => 'nullable|boolean',
