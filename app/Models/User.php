@@ -60,7 +60,10 @@ class User extends Authenticatable
 {
     return $this->role === 'beirut_airport';
 }
-
+public function isPermission(): bool
+{
+    return $this->role === 'permission';
+}
     /*
     |--------------------------------------------------------------------------
     | Dashboard Access
@@ -72,13 +75,14 @@ class User extends Authenticatable
     |
     */
 
-    public function canAccessDashboard(): bool
-    {
-        return $this->isAdmin()
-            || $this->isArmy()
-            || $this->isWatcher() 
-            || $this->role === 'beirut_airport';
-    }
+public function canAccessDashboard(): bool
+{
+    return $this->isAdmin()
+        || $this->isArmy()
+        || $this->isWatcher()
+        || $this->isBeirutAirport()
+        || $this->isPermission();
+}
 
 
     /*
@@ -110,7 +114,12 @@ class User extends Authenticatable
             || $this->isArmy();
     }
 
-
+public function canManageClearance(): bool
+{
+    return $this->isAdmin()
+        || $this->isArmy()
+        || $this->isPermission();
+}
     /*
     |--------------------------------------------------------------------------
     | Pilots List Access
@@ -121,18 +130,23 @@ class User extends Authenticatable
     |
     */
 
-    public function canViewPilots(): bool
-    {
-        return $this->isAdmin()
-            || $this->isArmy();
-    }
+public function canViewPilots(): bool
+{
+    return $this->isAdmin()
+        || $this->isArmy()
+        || $this->isPermission();
+}
 
-
-    public function canManagePilots(): bool
-    {
-        return $this->isAdmin();
-    }
-
+public function canManagePilots(): bool
+{
+    return $this->isAdmin();
+}
+public function canViewLocations(): bool
+{
+    return $this->isAdmin()
+        || $this->isArmy()
+        || $this->isPermission();
+}
 
     /*
     |--------------------------------------------------------------------------

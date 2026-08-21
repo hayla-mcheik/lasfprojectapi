@@ -334,7 +334,21 @@ Route::middleware([
 |   NO ACCESS
 |
 */
+Route::middleware([
+    'auth:sanctum',
+    'location_view_access',
+])
+->prefix('admin')
+->group(function () {
 
+    Route::get(
+        'flying-locations',
+        [
+            AdminFlyingLocationController::class,
+            'index'
+        ]
+    );
+});
 Route::middleware([
     'auth:sanctum',
     'army_access',
@@ -362,42 +376,6 @@ Route::middleware([
         |--------------------------------------------------------------------------
         */
 
-        Route::post(
-            'clearance-statuses',
-            [
-                AdminClearanceStatusController::class,
-                'store',
-            ]
-        );
-
-
-        Route::put(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'update',
-            ]
-        );
-
-
-        Route::patch(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'update',
-            ]
-        );
-
-
-        Route::delete(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'destroy',
-            ]
-        );
-
-
 
 
         Route::post(
@@ -418,10 +396,12 @@ Route::middleware([
         );
 
 
-        Route::apiResource(
-            'flying-locations',
-            AdminFlyingLocationController::class
-        );
+     Route::apiResource(
+        'flying-locations',
+        AdminFlyingLocationController::class
+    )->except([
+        'index',
+    ]);
     });
 
 
@@ -488,6 +468,10 @@ Route::middleware([
             AdminPilotController::class,
             'show',
         ]);
+                Route::get('sports', [
+            AdminSportController::class,
+            'index',
+        ]);
     });
 
 
@@ -506,48 +490,62 @@ Route::middleware([
 |
 */
 
+
 Route::middleware([
     'auth:sanctum',
-    'army_access',
+    'clearance_access',
 ])
-    ->prefix('admin')
-    ->group(function () {
+->prefix('admin')
+->group(function () {
 
-        /*
-        |--------------------------------------------------------------------------
-        | IMPORTANT:
-        | History must be before {clearanceStatus}.
-        |--------------------------------------------------------------------------
-        */
+    Route::get(
+        'clearance-statuses/history',
+        [
+            AdminClearanceStatusController::class,
+            'history'
+        ]
+    );
 
-        Route::get(
-            'clearance-statuses/history',
-            [
-                AdminClearanceStatusController::class,
-                'history',
-            ]
-        );
+    Route::get(
+        'clearance-statuses',
+        [
+            AdminClearanceStatusController::class,
+            'index'
+        ]
+    );
 
+    Route::get(
+        'clearance-statuses/{clearanceStatus}',
+        [
+            AdminClearanceStatusController::class,
+            'show'
+        ]
+    );
 
-        Route::get(
-            'clearance-statuses',
-            [
-                AdminClearanceStatusController::class,
-                'index',
-            ]
-        );
+    Route::post(
+        'clearance-statuses',
+        [
+            AdminClearanceStatusController::class,
+            'store'
+        ]
+    );
 
+    Route::put(
+        'clearance-statuses/{clearanceStatus}',
+        [
+            AdminClearanceStatusController::class,
+            'update'
+        ]
+    );
 
-        Route::get(
-            'clearance-statuses/{clearanceStatus}',
-            [
-                AdminClearanceStatusController::class,
-                'show',
-            ]
-        );
-    });
-
-
+    Route::patch(
+        'clearance-statuses/{clearanceStatus}',
+        [
+            AdminClearanceStatusController::class,
+            'update'
+        ]
+    );
+});
 /*
 |--------------------------------------------------------------------------
 | SUPER ADMIN ONLY ROUTES
@@ -669,17 +667,30 @@ Route::patch('/feedback/{feedback}', [
         ]);
 
 
-        /*
-        |--------------------------------------------------------------------------
-        | SPORTS
-        |--------------------------------------------------------------------------
-        */
+Route::post('sports', [
+    AdminSportController::class,
+    'store',
+]);
 
-        Route::apiResource(
-            'sports',
-            AdminSportController::class
-        );
+Route::get('sports/{sport}', [
+    AdminSportController::class,
+    'show',
+]);
 
+Route::put('sports/{sport}', [
+    AdminSportController::class,
+    'update',
+]);
+
+Route::patch('sports/{sport}', [
+    AdminSportController::class,
+    'update',
+]);
+
+Route::delete('sports/{sport}', [
+    AdminSportController::class,
+    'destroy',
+]);
 
         /*
         |--------------------------------------------------------------------------
@@ -846,6 +857,8 @@ Route::patch('/feedback/{feedback}', [
     ]);
 
 });
+
+
 
 /*
 |--------------------------------------------------------------------------
