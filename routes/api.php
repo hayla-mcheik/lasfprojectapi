@@ -490,7 +490,6 @@ Route::middleware([
 |
 */
 
-
 Route::middleware([
     'auth:sanctum',
     'clearance_access',
@@ -503,6 +502,20 @@ Route::middleware([
         [
             AdminClearanceStatusController::class,
             'history'
+        ]
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | STATUS CHANGE NOTIFICATIONS
+    |--------------------------------------------------------------------------
+    */
+
+    Route::get(
+        'clearance-statuses/changes',
+        [
+            AdminClearanceStatusController::class,
+            'changes'
         ]
     );
 

@@ -590,4 +590,48 @@ if ($user->isArmy()) {
             'data' => $history,
         ]);
     }
+    /*
+|--------------------------------------------------------------------------
+| Status Changes / Notifications
+|--------------------------------------------------------------------------
+|
+| Returns status changes that happened after the given timestamp.
+|
+*/
+
+public function changes(Request $request)
+{
+    $data = $request->validate([
+        'since' => 'nullable|date',
+    ]);
+
+    $since = $data['since']
+        ?? now()->subSeconds(10)->toDateTimeString();
+
+    $changes = ClearanceStatusHistory::query()
+        ->with([
+            'location:id,name,slug',
+            'changedBy:id,name,email,role',
+        ])
+        ->where('created_at', '>', $since)
+        ->where(function ($query) {
+
+            $query
+                ->whereColumn('old_status', '!=', 'new_status')
+                ->orWhere(function ($q) {
+
+                    $q->whereNull('old_status')
+                      ->whereNotNull('new_status');
+
+                });
+
+        })
+        ->latest('created_at')
+        ->get();
+
+    return response()->json([
+        'success' => true,
+        'data' => $changes,
+    ]);
+}
 }
