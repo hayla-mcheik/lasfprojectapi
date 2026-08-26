@@ -26,13 +26,14 @@ $query = FlyingLocation::with([
 
     'qrCode',
 
-    'clearanceStatuses' => function ($query) use ($date) {
+'clearanceStatuses' => function ($query) use ($date) {
 
-        $query
-            ->whereDate('permission_date', $date)
-            ->orderByDesc('permission_date');
+    $query
+        ->whereDate('permission_date', $date)
+        ->orderByDesc('permission_date')
+        ->with('updatedBy');
 
-    },
+},
 
 ])->withCount([
     'activeSessions as active_sessions'
@@ -74,25 +75,21 @@ $query = FlyingLocation::with([
 
 public function store(Request $request)
 {
-    $validator = Validator::make($request->all(), [
-        'name' => 'required|string|max:255',
-        'type' => 'nullable|string',
-        'takeoff_kato' => 'nullable|string',
-        'takeoff_nazim' => 'nullable|string',
-        'landing_kato' => 'nullable|string',
-        'landing_nazim' => 'nullable|string',
-        'boundaries_kato' => 'nullable|array',
-        'boundaries_nazim' => 'nullable|array',
-        'max_altitude' => 'nullable|string',
-        'description' => 'nullable|string',
-        'sports' => 'nullable|array',
-        'sports.*' => 'exists:sports,id',
-        'is_enabled' => 'boolean',
-
-        // Initial status
-        'clearance_status' => 'required|in:green,yellow,red',
-        'clearance_reason' => 'nullable|string|max:500',
-    ]);
+$validator = Validator::make($request->all(), [
+    'name' => 'required|string|max:255',
+    'type' => 'nullable|string',
+    'takeoff_kato' => 'nullable|string',
+    'takeoff_nazim' => 'nullable|string',
+    'landing_kato' => 'nullable|string',
+    'landing_nazim' => 'nullable|string',
+    'boundaries_kato' => 'nullable|array',
+    'boundaries_nazim' => 'nullable|array',
+    'max_altitude' => 'nullable|string',
+    'description' => 'nullable|string',
+    'sports' => 'nullable|array',
+    'sports.*' => 'exists:sports,id',
+    'is_enabled' => 'boolean',
+]);
 
     if ($validator->fails()) {
         return response()->json([
@@ -127,26 +124,6 @@ public function store(Request $request)
         if (!empty($data['sports'])) {
             $location->sports()->sync($data['sports']);
         }
-
-        $permission = ClearanceStatus::create([
-            'flying_location_id' => $location->id,
-            'permission_date'    => today(),
-            'status'             => $data['clearance_status'],
-            'reason'             => $data['clearance_reason'] ?? null,
-            'updated_by'         => auth()->id(),
-        ]);
-
-        ClearanceStatusHistory::create([
-            'clearance_status_id' => $permission->id,
-            'flying_location_id'  => $location->id,
-            'permission_date'     => today(),
-            'old_status'          => null,
-            'old_reason'          => null,
-            'new_status'          => $permission->status,
-            'new_reason'          => $permission->reason,
-            'changed_by'          => auth()->id(),
-            'action'              => 'created',
-        ]);
 
         DB::commit();
 
@@ -213,24 +190,21 @@ public function show(Request $request, FlyingLocation $flyingLocation)
 
 public function update(Request $request, FlyingLocation $flyingLocation)
 {
-    $validator = Validator::make($request->all(), [
-
-        'name' => 'sometimes|string|max:255',
-        'type' => 'sometimes|string',
-        'takeoff_kato' => 'nullable|string',
-        'takeoff_nazim' => 'nullable|string',
-        'landing_kato' => 'nullable|string',
-        'landing_nazim' => 'nullable|string',
-        'boundaries_kato' => 'nullable|array',
-        'boundaries_nazim' => 'nullable|array',
-        'max_altitude' => 'nullable|string',
-        'description' => 'nullable|string',
-        'sports' => 'nullable|array',
-        'sports.*' => 'exists:sports,id',
-        'is_enabled' => 'boolean',
-
-    ]);
-
+$validator = Validator::make($request->all(), [
+    'name' => 'required|string|max:255',
+    'type' => 'nullable|string',
+    'takeoff_kato' => 'nullable|string',
+    'takeoff_nazim' => 'nullable|string',
+    'landing_kato' => 'nullable|string',
+    'landing_nazim' => 'nullable|string',
+    'boundaries_kato' => 'nullable|array',
+    'boundaries_nazim' => 'nullable|array',
+    'max_altitude' => 'nullable|string',
+    'description' => 'nullable|string',
+    'sports' => 'nullable|array',
+    'sports.*' => 'exists:sports,id',
+    'is_enabled' => 'boolean',
+]);
     if ($validator->fails()) {
 
         return response()->json([

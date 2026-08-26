@@ -125,188 +125,138 @@ class ClearanceStatusController extends Controller
     |
     */
 
-    public function store(Request $request)
-    {
-        $data = $request->validate([
-            'flying_location_id' =>
-                'required|integer|exists:flying_locations,id',
+public function store(Request $request)
+{
+    $data = $request->validate([
+        'flying_location_id' => 'required|integer|exists:flying_locations,id',
+        'permission_date' => 'required|date_format:Y-m-d',
+        'status' => 'required|in:green,yellow,red',
+        'reason' => 'nullable|string|max:500',
+    ]);
 
-            'permission_date' =>
-                'required|date_format:Y-m-d',
+    $user = $request->user();
 
-            'status' =>
-                'required|in:green,yellow,red',
+    return DB::transaction(function () use ($data, $user) {
 
-            'reason' =>
-                'nullable|string|max:500',
-        ]);
+        $permission = ClearanceStatus::query()
+            ->where('flying_location_id', $data['flying_location_id'])
+            ->whereDate('permission_date', $data['permission_date'])
+            ->lockForUpdate()
+            ->first();
 
-        return DB::transaction(function () use ($data) {
+        $currentStatus = $permission?->status ?? 'red';
 
-            /*
-            |--------------------------------------------------------------------------
-            | Lock Existing Daily Permission
-            |--------------------------------------------------------------------------
-            */
+        /*
+        |--------------------------------------------------------------------------
+        | Permission
+        |--------------------------------------------------------------------------
+        */
 
-            $permission = ClearanceStatus::query()
-                ->where(
-                    'flying_location_id',
-                    $data['flying_location_id']
-                )
-                ->whereDate(
-                    'permission_date',
-                    $data['permission_date']
-                )
-                ->lockForUpdate()
-                ->first();
+        if ($user->isPermission()) {
 
-            /*
-            |--------------------------------------------------------------------------
-            | Existing Permission
-            |--------------------------------------------------------------------------
-            */
-
-            if ($permission) {
-
-                $oldStatus = $permission->status;
-                $oldReason = $permission->reason;
-
-                $permission->update([
-                    'status' =>
-                        $data['status'],
-
-                    'reason' =>
-                        $data['reason'] ?? null,
-
-                    'updated_by' =>
-                        auth()->id(),
-                ]);
-
-                /*
-                |--------------------------------------------------------------------------
-                | Only Create History When Something Changed
-                |--------------------------------------------------------------------------
-                */
-
-                if (
-                    $oldStatus !== $permission->status
-                    || $oldReason !== $permission->reason
-                ) {
-                    ClearanceStatusHistory::create([
-
-                        'clearance_status_id' =>
-                            $permission->id,
-
-                        'flying_location_id' =>
-                            $permission->flying_location_id,
-
-                        'permission_date' =>
-                            $permission->permission_date,
-
-                        'old_status' =>
-                            $oldStatus,
-
-                        'old_reason' =>
-                            $oldReason,
-
-                        'new_status' =>
-                            $permission->status,
-
-                        'new_reason' =>
-                            $permission->reason,
-
-                        'changed_by' =>
-                            auth()->id(),
-
-                        'action' =>
-                            'updated',
-                    ]);
-                }
-
+            if (
+                $currentStatus !== 'red' ||
+                $data['status'] !== 'yellow'
+            ) {
                 return response()->json([
-                    'success' => true,
-
+                    'success' => false,
                     'message' =>
-                        'Daily permission updated successfully.',
+                        'Permission can only change CLOSED to PENDING.'
+                ], 403);
+            }
+        }
 
-                    'data' =>
-                        $permission->load([
-                            'location',
-                            'updatedBy',
-                        ]),
+        /*
+        |--------------------------------------------------------------------------
+        | Army
+        |--------------------------------------------------------------------------
+        */
+
+ if ($user->isArmy()) {
+
+    if (!in_array($data['status'], ['green', 'red'], true)) {
+
+        return response()->json([
+            'success' => false,
+            'message' =>
+                'Army can only change the status to OPEN or CLOSED.'
+        ], 403);
+    }
+}
+
+        /*
+        |--------------------------------------------------------------------------
+        | Existing record
+        |--------------------------------------------------------------------------
+        */
+
+        if ($permission) {
+
+            $oldStatus = $permission->status;
+            $oldReason = $permission->reason;
+
+            $permission->update([
+                'status' => $data['status'],
+                'reason' => $data['reason'] ?? null,
+                'updated_by' => $user->id,
+            ]);
+
+            if (
+                $oldStatus !== $permission->status ||
+                $oldReason !== $permission->reason
+            ) {
+                ClearanceStatusHistory::create([
+                    'clearance_status_id' => $permission->id,
+                    'flying_location_id' => $permission->flying_location_id,
+                    'permission_date' => $permission->permission_date,
+                    'old_status' => $oldStatus,
+                    'old_reason' => $oldReason,
+                    'new_status' => $permission->status,
+                    'new_reason' => $permission->reason,
+                    'changed_by' => $user->id,
+                    'action' => 'updated',
                 ]);
             }
 
+        } else {
+
             /*
             |--------------------------------------------------------------------------
-            | Create New Permission
+            | New record
             |--------------------------------------------------------------------------
             */
 
             $permission = ClearanceStatus::create([
-
-                'flying_location_id' =>
-                    $data['flying_location_id'],
-
-                'permission_date' =>
-                    $data['permission_date'],
-
-                'status' =>
-                    $data['status'],
-
-                'reason' =>
-                    $data['reason'] ?? null,
-
-                'updated_by' =>
-                    auth()->id(),
+                'flying_location_id' => $data['flying_location_id'],
+                'permission_date' => $data['permission_date'],
+                'status' => $data['status'],
+                'reason' => $data['reason'] ?? null,
+                'updated_by' => $user->id,
             ]);
 
             ClearanceStatusHistory::create([
-
-                'clearance_status_id' =>
-                    $permission->id,
-
-                'flying_location_id' =>
-                    $permission->flying_location_id,
-
-                'permission_date' =>
-                    $permission->permission_date,
-
-                'old_status' =>
-                    null,
-
-                'old_reason' =>
-                    null,
-
-                'new_status' =>
-                    $permission->status,
-
-                'new_reason' =>
-                    $permission->reason,
-
-                'changed_by' =>
-                    auth()->id(),
-
-                'action' =>
-                    'created',
+                'clearance_status_id' => $permission->id,
+                'flying_location_id' => $permission->flying_location_id,
+                'permission_date' => $permission->permission_date,
+                'old_status' => null,
+                'old_reason' => null,
+                'new_status' => $permission->status,
+                'new_reason' => $permission->reason,
+                'changed_by' => $user->id,
+                'action' => 'created',
             ]);
+        }
 
-            return response()->json([
-                'success' => true,
-
-                'message' =>
-                    'Daily permission created successfully.',
-
-                'data' =>
-                    $permission->load([
-                        'location',
-                        'updatedBy',
-                    ]),
-            ], 201);
-        });
-    }
-
+        return response()->json([
+            'success' => true,
+            'message' => 'Daily permission updated successfully.',
+            'data' => $permission->load([
+                'location',
+                'updatedBy',
+            ]),
+        ]);
+    });
+}
 
     /*
     |--------------------------------------------------------------------------
@@ -335,114 +285,175 @@ class ClearanceStatusController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function update(
-        Request $request,
-        ClearanceStatus $clearanceStatus
+public function update(
+    Request $request,
+    ClearanceStatus $clearanceStatus
+) {
+    $data = $request->validate([
+        'status' => 'sometimes|required|in:green,yellow,red',
+        'reason' => 'nullable|string|max:500',
+    ]);
+
+    $user = $request->user();
+
+    return DB::transaction(function () use (
+        $data,
+        $clearanceStatus,
+        $user
     ) {
-        $data = $request->validate([
 
-            'status' =>
-                'sometimes|required|in:green,yellow,red',
+        /*
+        |--------------------------------------------------------------------------
+        | Lock Current Record
+        |--------------------------------------------------------------------------
+        */
 
-            'reason' =>
-                'nullable|string|max:500',
+        $permission = ClearanceStatus::query()
+            ->whereKey($clearanceStatus->id)
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        $oldStatus = $permission->status;
+        $oldReason = $permission->reason;
+
+        $newStatus = $data['status'] ?? $oldStatus;
+
+        /*
+        |--------------------------------------------------------------------------
+        | Permission Account
+        |--------------------------------------------------------------------------
+        |
+        | Permission can ONLY:
+        |
+        | CLOSED -> PENDING
+        |
+        */
+
+        if ($user->isPermission()) {
+
+            if (
+                $oldStatus !== 'red' ||
+                $newStatus !== 'yellow'
+            ) {
+                return response()->json([
+                    'success' => false,
+                    'message' =>
+                        'Permission can only change CLOSED to PENDING.'
+                ], 403);
+            }
+        }
+
+  /*
+|--------------------------------------------------------------------------
+| Army Account
+|--------------------------------------------------------------------------
+|
+| Army can:
+|
+| PENDING -> OPEN
+| PENDING -> CLOSED
+| OPEN    -> CLOSED
+| CLOSED  -> OPEN
+|
+| Army cannot change a status to PENDING.
+|
+*/
+
+if ($user->isArmy()) {
+
+    if (!in_array($newStatus, ['green', 'red'], true)) {
+
+        return response()->json([
+            'success' => false,
+            'message' =>
+                'Army can only change the status to OPEN or CLOSED.'
+        ], 403);
+    }
+}
+        /*
+        |--------------------------------------------------------------------------
+        | Admin
+        |--------------------------------------------------------------------------
+        |
+        | Admin can change any status.
+        |
+        */
+
+        if ($user->isAdmin()) {
+            // No restriction
+        }
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Permission
+        |--------------------------------------------------------------------------
+        */
+
+        $permission->update([
+            'status' => $newStatus,
+
+            'reason' => array_key_exists('reason', $data)
+                ? $data['reason']
+                : $permission->reason,
+
+            'updated_by' => $user->id,
         ]);
 
-        return DB::transaction(
-            function () use (
-                $data,
-                $clearanceStatus
-            ) {
+        /*
+        |--------------------------------------------------------------------------
+        | Save History
+        |--------------------------------------------------------------------------
+        */
 
-                /*
-                |--------------------------------------------------------------------------
-                | Lock Current Record
-                |--------------------------------------------------------------------------
-                */
+        if (
+            $oldStatus !== $permission->status ||
+            $oldReason !== $permission->reason
+        ) {
 
-                $permission = ClearanceStatus::query()
-                    ->whereKey($clearanceStatus->id)
-                    ->lockForUpdate()
-                    ->firstOrFail();
+            ClearanceStatusHistory::create([
+                'clearance_status_id' =>
+                    $permission->id,
 
-                $oldStatus =
-                    $permission->status;
+                'flying_location_id' =>
+                    $permission->flying_location_id,
 
-                $oldReason =
-                    $permission->reason;
+                'permission_date' =>
+                    $permission->permission_date,
 
-                $permission->update([
+                'old_status' =>
+                    $oldStatus,
 
-                    'status' =>
-                        $data['status']
-                        ?? $permission->status,
+                'old_reason' =>
+                    $oldReason,
 
-                    'reason' =>
-                        array_key_exists('reason', $data)
-                            ? $data['reason']
-                            : $permission->reason,
+                'new_status' =>
+                    $permission->status,
 
-                    'updated_by' =>
-                        auth()->id(),
-                ]);
+                'new_reason' =>
+                    $permission->reason,
 
-                /*
-                |--------------------------------------------------------------------------
-                | Write History Only If Changed
-                |--------------------------------------------------------------------------
-                */
+                'changed_by' =>
+                    $user->id,
 
-                if (
-                    $oldStatus !== $permission->status
-                    || $oldReason !== $permission->reason
-                ) {
-                    ClearanceStatusHistory::create([
+                'action' =>
+                    'updated',
+            ]);
+        }
 
-                        'clearance_status_id' =>
-                            $permission->id,
+        return response()->json([
+            'success' => true,
 
-                        'flying_location_id' =>
-                            $permission->flying_location_id,
+            'message' =>
+                'Daily permission updated successfully.',
 
-                        'permission_date' =>
-                            $permission->permission_date,
-
-                        'old_status' =>
-                            $oldStatus,
-
-                        'old_reason' =>
-                            $oldReason,
-
-                        'new_status' =>
-                            $permission->status,
-
-                        'new_reason' =>
-                            $permission->reason,
-
-                        'changed_by' =>
-                            auth()->id(),
-
-                        'action' =>
-                            'updated',
-                    ]);
-                }
-
-                return response()->json([
-                    'success' => true,
-
-                    'message' =>
-                        'Daily permission updated successfully.',
-
-                    'data' =>
-                        $permission->load([
-                            'location',
-                            'updatedBy',
-                        ]),
-                ]);
-            }
-        );
-    }
-
+            'data' =>
+                $permission->load([
+                    'location',
+                    'updatedBy',
+                ]),
+        ]);
+    });
+}
 
     /*
     |--------------------------------------------------------------------------

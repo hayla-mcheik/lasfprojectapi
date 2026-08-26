@@ -84,7 +84,7 @@ class ImportKmlPolygons extends Command
             'FALOUGHA' => 'falogha',
             'AQEIBE' => 'alaakyb-nhr-abrahym',
             'JBAA' => 'gbaaa',
-            'TERBOL' => null,
+            'TERBOL' => 'terbol',
             'DEIR EL QAMAR' => 'dyr-alkmr-aabyh-kfrmt',
             'JOUNIEH' => 'mntk-gony',
             'JBEIL' => 'gbyl',
