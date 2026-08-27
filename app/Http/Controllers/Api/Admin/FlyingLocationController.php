@@ -117,7 +117,7 @@ $validator = Validator::make($request->all(), [
             'landing_nazim' => $data['landing_nazim'] ?? null,
             'boundaries_kato' => $data['boundaries_kato'] ?? null,
             'boundaries_nazim' => $data['boundaries_nazim'] ?? null,
-            'max_altitude' => $data['max_altitude'] ?? null,
+      'max_altitude' => $data['max_altitude'] ?? '0',
             'is_enabled' => $data['is_enabled'],
         ]);
 
