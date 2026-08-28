@@ -40,7 +40,7 @@ protected $casts = [
 
     'ratings' => 'array',
 
-    'disciplines' => 'array',
+    // 'disciplines' => 'array',
 
     'licenses_attachments' => 'array',
 

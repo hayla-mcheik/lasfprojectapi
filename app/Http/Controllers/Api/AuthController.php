@@ -290,14 +290,18 @@ public function myMembership(Request $request)
 }
 public function updateMembership(Request $request)
 {
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'phone' => 'required|string|max:20',
- 'date_of_birth' => 'nullable|date|before:today',
-        'blood_type' => 'required',
-        'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-        'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
-    ]);
+$request->validate([
+    'name' => 'required|string|max:255',
+    'phone' => 'required|string|max:20',
+    'date_of_birth' => 'nullable|date|before:today',
+    'blood_type' => 'required',
+
+    'disciplines' => 'required|array|min:1',
+    'disciplines.*' => 'exists:sports,id',
+
+    'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
+    'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
+]);
 
     $user = $request->user();
 
@@ -347,13 +351,17 @@ if ($request->hasFile('image')) {
     $profileData['image'] = '/storage/' . $path;
 }
 
-    $user->pilotProfile()->update($profileData);
+$user->pilotProfile()->update($profileData);
 
-    return response()->json([
-        'success' => true,
-        'message' => 'Membership updated successfully.',
-        'user' => $user->load('pilotProfile.disciplines')
-    ]);
+$user->pilotProfile->disciplines()->sync(
+    $request->disciplines
+);
+
+return response()->json([
+    'success' => true,
+    'message' => 'Membership updated successfully.',
+    'user' => $user->load('pilotProfile.disciplines')
+]);
 }
 
 
