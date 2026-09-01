@@ -491,6 +491,7 @@ public function reject(User $pilot)
             return response()->json(['success' => false, 'message' => 'Import operational synchronization anomaly: ' . $e->getMessage()], 500);
         }
     }
+    
 
 public function licenses(User $pilot)
 {
