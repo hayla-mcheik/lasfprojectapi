@@ -439,7 +439,10 @@ Route::middleware([
             'index',
         ]);
 
-
+Route::get('pilots/{pilot}/avatar', [
+    AdminPilotController::class,
+    'avatar',
+]);
         Route::get(
             'pilots/{pilot}/licenses',
             [

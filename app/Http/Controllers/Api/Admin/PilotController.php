@@ -492,6 +492,35 @@ public function reject(User $pilot)
         }
     }
     
+public function avatar($pilot)
+{
+    $pilot = \App\Models\User::with('pilotProfile')->findOrFail($pilot);
+
+    $image = $pilot->pilotProfile?->image;
+
+    if (!$image) {
+        abort(404, 'Pilot image not found.');
+    }
+
+    $relativePath = ltrim(
+        preg_replace('#^/storage/#', '', $image),
+        '/'
+    );
+
+    $fullPath = storage_path(
+        'app/public/' . $relativePath
+    );
+
+    if (!file_exists($fullPath)) {
+        abort(404, 'Pilot image file not found.');
+    }
+
+    return response()->file($fullPath, [
+        'Content-Type' => mime_content_type($fullPath),
+        'Access-Control-Allow-Origin' => '*',
+        'Cache-Control' => 'public, max-age=3600',
+    ]);
+}
 
 public function licenses(User $pilot)
 {
