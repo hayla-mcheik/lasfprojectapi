@@ -42,260 +42,601 @@ class PilotController extends Controller
         return response()->json($query->latest()->paginate($perPage));
     }
 
-    public function store(Request $request)
-    {
- $validator = Validator::make($request->all(), [
+public function store(Request $request)
+{
+    $validator = Validator::make($request->all(), [
 
-    'name' => 'required|string|max:255',
-    'email' => 'required|email|unique:users,email',
-    'phone' => 'nullable|string|max:20',
+        'name' => 'required|string|max:255',
+        'email' => 'required|email|unique:users,email',
+        'phone' => 'nullable|string|max:20',
 
-    'date_of_birth' => 'nullable|date',
+        'date_of_birth' => 'nullable|date',
 
-    'blood_type' => 'required|string|max:5',
+        'blood_type' => 'required|string|max:5',
 
-    'club_name' => 'required|string|max:100',
+        'club_name' => 'required|string|max:100',
 
-    'club_code' => 'required|string|max:10',
+        'club_code' => 'required|string|max:10',
 
-    'insurance_provider' => 'nullable|string|max:150',
+        'insurance_provider' => 'nullable|string|max:150',
 
-    'insurance_number' => 'nullable|string|max:100',
+        'insurance_number' => 'nullable|string|max:100',
 
-    'designation' => 'nullable|string|max:100',
+        'designation' => 'nullable|string|max:100',
 
-    'facebook_url' => 'nullable|url|max:255',
+        'facebook_url' => 'nullable|url|max:255',
 
-    'instagram_url' => 'nullable|url|max:255',
+        'instagram_url' => 'nullable|url|max:255',
 
-    'disciplines' => 'required|array',
+        'disciplines' => 'required|array',
 
-    'ratings' => 'required|array',
+        'ratings' => 'required|array',
 
-    'image' => 'nullable|image|max:2048',
+        'image' => 'nullable|image|max:2048',
 
-    'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+        'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
 
-    // NEW
-    'is_banned' => 'nullable|boolean',
-    'ban_until' => 'nullable|date',
-    'ban_reason' => 'nullable|string|max:1000',
+        'is_banned' => 'nullable|boolean',
 
-]);
+        'ban_until' => 'nullable|date',
 
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
-        }
+        'ban_reason' => 'nullable|string|max:1000',
 
-        DB::beginTransaction();
-        try {
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'password' => bcrypt('password'),
-                'is_admin' => false,
-                'is_active' => $request->is_active ?? true,
-            ]);
+    ]);
 
-            $currentYear = Carbon::now()->format('y'); 
-            $paddedClubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT); 
-            
-            $clubSequenceCount = PilotProfile::where('club_code', $paddedClubCode)->count();
-            $sequence = str_pad($clubSequenceCount + 1, 4, '0', STR_PAD_LEFT); 
-            $generatedLicenseNumber = "{$currentYear}-{$paddedClubCode}-{$sequence}";
-
-            $avatarUrl = null;
-            if ($request->hasFile('image')) {
-                $path = $request->file('image')->store('pilots/avatars', 'public');
-                $avatarUrl = Storage::url($path);
-            }
-
-            $licenseAttachments = [];
-            if ($request->hasFile('licenses')) {
-                foreach ($request->file('licenses') as $file) {
-                 $path = $file->store(
-    'pilots/licenses',
-    'public'
-);
-
-$licenseAttachments[] = '/storage/' . $path;
-                }
-            }
-
-            // Updated relation builder call to use camelCase function: pilotProfile()
-            $profile = $user->pilotProfile()->create([
-                'license_number' => $generatedLicenseNumber,
-                'blood_type' => $request->blood_type,
-                'ratings' => implode(' | ', $request->ratings),
-                'insurance_provider' => $request->insurance_provider,
-                'insurance_number' => $request->insurance_number,
-                'club_name' => $request->club_name,
-                'club_code' => $paddedClubCode,
-                'facebook_url' => $request->facebook_url,
-                'instagram_url' => $request->instagram_url,
-                'designation' => $request->designation ?? 'Professional Pilot',
-                'image' => $avatarUrl,
-                'licenses_attachments' => $licenseAttachments,
-        'valid_until' => Carbon::now()->addYear(),
-
-'date_of_birth' => $request->date_of_birth,
-
-'is_banned' => $request->boolean('is_banned'),
-
-'ban_until' => $request->filled('ban_until')
-    ? Carbon::parse($request->ban_until)
-    : null,
-
-'ban_reason' => $request->ban_reason,
-            ]);
-
-            $profile->disciplines()->sync($request->disciplines);
-
-            DB::commit();
-            return response()->json(['success' => true, 'data' => $user->load('pilotProfile.disciplines')], 201);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
-        }
+    if ($validator->fails()) {
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
     }
 
-    public function update(Request $request, User $pilot)
-    {
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'email' => 'sometimes|email|unique:users,email,' . $pilot->id,
-            'phone' => 'nullable|string|max:20',
-            'blood_type' => 'required|string|max:5',
-            'club_name' => 'required|string|max:100',
-            'club_code' => 'required|string|max:10',
-            'insurance_provider' => 'nullable|string|max:150',
-            'insurance_number' => 'nullable|string|max:100',
-            'designation' => 'nullable|string|max:100',
-            'facebook_url' => 'nullable|url|max:255',
-            'instagram_url' => 'nullable|url|max:255',
-            'disciplines' => 'required|array',
-            'ratings' => 'required|array',
-            'image' => 'nullable|image|max:2048',
-         'licenses.*' => 'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+    DB::beginTransaction();
 
-'date_of_birth' => 'nullable|date',
+    try {
 
-// NEW
-'is_banned' => 'nullable|boolean',
-'ban_until' => 'nullable|date',
-'ban_reason' => 'nullable|string|max:1000',
+        // Create user
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => bcrypt('password'),
+            'is_admin' => false,
+            'is_active' => $request->is_active ?? true,
         ]);
 
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        // Generate license number
+        $currentYear = Carbon::now()->format('y');
+
+        $paddedClubCode = str_pad(
+            $request->club_code,
+            2,
+            '0',
+            STR_PAD_LEFT
+        );
+
+        $clubSequenceCount = PilotProfile::where(
+            'club_code',
+            $paddedClubCode
+        )->count();
+
+        $sequence = str_pad(
+            $clubSequenceCount + 1,
+            4,
+            '0',
+            STR_PAD_LEFT
+        );
+
+        $generatedLicenseNumber =
+            "{$currentYear}-{$paddedClubCode}-{$sequence}";
+
+
+        // Upload pilot image
+        $avatarUrl = null;
+
+        if ($request->hasFile('image')) {
+
+            $path = $request->file('image')->store(
+                'pilots/avatars',
+                'public'
+            );
+
+            $avatarUrl = Storage::url($path);
         }
 
-        DB::beginTransaction();
-        try {
-            $pilot->update($request->only(['name', 'email', 'phone', 'is_active']));
-            
-            // Updated property call to camelCase relation: pilotProfile
-            $profile = $pilot->pilotProfile;
 
-            $oldClubCode = $profile?->club_code;
-            $newClubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT);
-            $licenseNumber = $profile?->license_number;
+        // Upload license/supporting documents
+        $licenseAttachments = [];
 
-            if ($oldClubCode !== $newClubCode) {
-                $currentYear = Carbon::now()->format('y');
-                $clubSequenceCount = PilotProfile::where('club_code', $newClubCode)->count();
-                $sequence = str_pad($clubSequenceCount + 1, 4, '0', STR_PAD_LEFT);
-                $licenseNumber = "{$currentYear}-{$newClubCode}-{$sequence}";
+        if ($request->hasFile('licenses')) {
+
+            foreach ($request->file('licenses') as $file) {
+
+                $path = $file->store(
+                    'pilots/licenses',
+                    'public'
+                );
+
+                $licenseAttachments[] = '/storage/' . $path;
+            }
+        }
+
+
+        // Create pilot profile
+        $profile = $user->pilotProfile()->create([
+
+            'license_number' => $generatedLicenseNumber,
+
+            'blood_type' => $request->blood_type,
+
+            'ratings' => implode(
+                ' | ',
+                $request->ratings
+            ),
+
+            'insurance_provider' =>
+                $request->insurance_provider,
+
+            'insurance_number' =>
+                $request->insurance_number,
+
+            'club_name' =>
+                $request->club_name,
+
+            'club_code' =>
+                $paddedClubCode,
+
+            'facebook_url' =>
+                $request->facebook_url,
+
+            'instagram_url' =>
+                $request->instagram_url,
+
+            'designation' =>
+                $request->designation ??
+                'Professional Pilot',
+
+            'image' =>
+                $avatarUrl,
+
+            'licenses_attachments' =>
+                $licenseAttachments,
+
+            'valid_until' =>
+                Carbon::now()->addYear(),
+
+            'date_of_birth' =>
+                $request->date_of_birth,
+
+            'is_banned' =>
+                $request->boolean('is_banned'),
+
+            'ban_until' =>
+                $request->filled('ban_until')
+                    ? Carbon::parse($request->ban_until)
+                    : null,
+
+            'ban_reason' =>
+                $request->ban_reason,
+        ]);
+
+
+        // Sync disciplines
+        $profile->disciplines()->sync(
+            $request->disciplines
+        );
+
+
+        DB::commit();
+
+        return response()->json([
+            'success' => true,
+            'data' => $user->load(
+                'pilotProfile.disciplines'
+            )
+        ], 201);
+
+
+    } catch (\Exception $e) {
+
+        DB::rollBack();
+
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
+
+public function update(Request $request, User $pilot)
+{
+    $validator = Validator::make($request->all(), [
+
+        'name' => 'sometimes|string|max:255',
+
+        'email' =>
+            'sometimes|email|unique:users,email,' . $pilot->id,
+
+        'phone' => 'nullable|string|max:20',
+
+        'blood_type' => 'required|string|max:5',
+
+        'club_name' => 'required|string|max:100',
+
+        'club_code' => 'required|string|max:10',
+
+        'insurance_provider' => 'nullable|string|max:150',
+
+        'insurance_number' => 'nullable|string|max:100',
+
+        'designation' => 'nullable|string|max:100',
+
+        'facebook_url' => 'nullable|url|max:255',
+
+        'instagram_url' => 'nullable|url|max:255',
+
+        'disciplines' => 'required|array',
+
+        'ratings' => 'required|array',
+
+        'image' => 'nullable|image|max:2048',
+
+        'licenses.*' =>
+            'nullable|file|mimes:pdf,jpg,png,jpeg|max:4096',
+
+        'date_of_birth' => 'nullable|date',
+
+        'is_banned' => 'nullable|boolean',
+
+        'ban_until' => 'nullable|date',
+
+        'ban_reason' => 'nullable|string|max:1000',
+
+    ]);
+
+
+    if ($validator->fails()) {
+
+        return response()->json([
+            'success' => false,
+            'errors' => $validator->errors()
+        ], 422);
+    }
+
+
+    DB::beginTransaction();
+
+    try {
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update User
+        |--------------------------------------------------------------------------
+        */
+
+        $pilot->update(
+            $request->only([
+                'name',
+                'email',
+                'phone',
+                'is_active'
+            ])
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Get Pilot Profile
+        |--------------------------------------------------------------------------
+        */
+
+        $profile = $pilot->pilotProfile;
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | License Number
+        |--------------------------------------------------------------------------
+        */
+
+        $oldClubCode = $profile?->club_code;
+
+        $newClubCode = str_pad(
+            $request->club_code,
+            2,
+            '0',
+            STR_PAD_LEFT
+        );
+
+        $licenseNumber = $profile?->license_number;
+
+
+        if ($oldClubCode !== $newClubCode) {
+
+            $currentYear = Carbon::now()->format('y');
+
+            $clubSequenceCount = PilotProfile::where(
+                'club_code',
+                $newClubCode
+            )->count();
+
+            $sequence = str_pad(
+                $clubSequenceCount + 1,
+                4,
+                '0',
+                STR_PAD_LEFT
+            );
+
+            $licenseNumber =
+                "{$currentYear}-{$newClubCode}-{$sequence}";
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Profile Data
+        |--------------------------------------------------------------------------
+        */
+
+        $profileData = [
+
+            'license_number' =>
+                $licenseNumber,
+
+            'blood_type' =>
+                $request->blood_type,
+
+            'ratings' =>
+                implode(
+                    ' | ',
+                    $request->ratings
+                ),
+
+            'insurance_provider' =>
+                $request->insurance_provider,
+
+            'insurance_number' =>
+                $request->insurance_number,
+
+            'club_name' =>
+                $request->club_name,
+
+            'club_code' =>
+                $newClubCode,
+
+            'facebook_url' =>
+                $request->facebook_url,
+
+            'instagram_url' =>
+                $request->instagram_url,
+
+            'designation' =>
+                $request->designation,
+
+            'date_of_birth' =>
+                $request->date_of_birth,
+
+            /*
+            |--------------------------------------------------------------------------
+            | Ban Fields
+            |--------------------------------------------------------------------------
+            */
+
+            'is_banned' =>
+                $request->boolean('is_banned'),
+
+            'ban_until' =>
+                $request->filled('ban_until')
+                    ? Carbon::parse($request->ban_until)
+                    : null,
+
+            'ban_reason' =>
+                $request->ban_reason,
+        ];
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update Pilot Image
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->hasFile('image')) {
+
+            if ($profile && $profile->image) {
+
+                $oldPath = str_replace(
+                    '/storage/',
+                    '',
+                    $profile->image
+                );
+
+                Storage::disk('public')->delete(
+                    $oldPath
+                );
             }
 
-$profileData = [
 
-    'license_number' => $licenseNumber,
+            $path = $request->file('image')->store(
+                'pilots/avatars',
+                'public'
+            );
 
-    'blood_type' => $request->blood_type,
 
-    'ratings' => implode(' | ', $request->ratings),
+            $profileData['image'] =
+                Storage::url($path);
+        }
 
-    'insurance_provider' => $request->insurance_provider,
 
-    'insurance_number' => $request->insurance_number,
+        /*
+        |--------------------------------------------------------------------------
+        | Update License / Supporting Documents
+        |--------------------------------------------------------------------------
+        */
 
-    'club_name' => $request->club_name,
+        if ($request->hasFile('licenses')) {
 
-    'club_code' => $newClubCode,
+            /*
+            |--------------------------------------------------------------------------
+            | Get existing attachments
+            |--------------------------------------------------------------------------
+            */
 
-    'facebook_url' => $request->facebook_url,
+            $existingFiles =
+                $profile?->licenses_attachments ?? [];
 
-    'instagram_url' => $request->instagram_url,
 
-    'designation' => $request->designation,
+            /*
+            |--------------------------------------------------------------------------
+            | Make sure existing files are an array
+            |--------------------------------------------------------------------------
+            */
 
-    'date_of_birth' => $request->date_of_birth,
+            if (is_string($existingFiles)) {
 
-    // ------------------------
-    // NEW BAN FIELDS
-    // ------------------------
+                $decoded =
+                    json_decode(
+                        $existingFiles,
+                        true
+                    );
 
-    'is_banned' => $request->boolean('is_banned'),
 
-    'ban_until' => $request->filled('ban_until')
-        ? Carbon::parse($request->ban_until)
-        : null,
+                if (
+                    json_last_error() === JSON_ERROR_NONE
+                    && is_array($decoded)
+                ) {
 
-    'ban_reason' => $request->ban_reason,
+                    $existingFiles = $decoded;
 
-];
+                } else {
 
-            if ($request->hasFile('image')) {
-                if ($profile && $profile->image) {
-                    $oldPath = str_replace('/storage/', '', $profile->image);
-                    Storage::disk('public')->delete($oldPath);
+                    // Single file path stored as string
+                    $existingFiles = [
+                        $existingFiles
+                    ];
                 }
-                $path = $request->file('image')->store('pilots/avatars', 'public');
-                $profileData['image'] = Storage::url($path);
             }
 
-       if ($request->hasFile('licenses')) {
 
-    // Delete old files
-    if (!empty($profile->licenses_attachments)) {
+            /*
+            |--------------------------------------------------------------------------
+            | Final safety check
+            |--------------------------------------------------------------------------
+            */
 
-  foreach ($profile->licenses_attachments as $oldFile) {
+            if (!is_array($existingFiles)) {
 
-    $oldPath = str_replace('/storage/', '', $oldFile);
+                $existingFiles = [];
+            }
 
-    Storage::disk('public')->delete($oldPath);
-}
-    }
 
-    $newFiles = [];
+            /*
+            |--------------------------------------------------------------------------
+            | Delete Old Files
+            |--------------------------------------------------------------------------
+            */
 
-    foreach ($request->file('licenses') as $file) {
+            foreach ($existingFiles as $oldFile) {
 
-     $path = $file->store(
-    'pilots/licenses',
-    'public'
-);
+                if (!$oldFile) {
+                    continue;
+                }
 
-$newFiles[] = '/storage/' . $path;
-    }
 
-    $profileData['licenses_attachments'] = $newFiles;
-}
+                $oldPath = str_replace(
+                    '/storage/',
+                    '',
+                    $oldFile
+                );
 
-            // Updated method call to use camelCase relation builder: pilotProfile()
-            $updatedProfile = $pilot->pilotProfile()->updateOrCreate(['user_id' => $pilot->id], $profileData);
-            $updatedProfile->disciplines()->sync($request->disciplines);
 
-            DB::commit();
-            return response()->json(['success' => true, 'data' => $pilot->load('pilotProfile.disciplines')]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['success' => false, 'error' => $e->getMessage()], 500);
+                Storage::disk('public')->delete(
+                    $oldPath
+                );
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Store New Files
+            |--------------------------------------------------------------------------
+            */
+
+            $newFiles = [];
+
+
+            foreach ($request->file('licenses') as $file) {
+
+                $path = $file->store(
+                    'pilots/licenses',
+                    'public'
+                );
+
+
+                $newFiles[] =
+                    '/storage/' . $path;
+            }
+
+
+            $profileData['licenses_attachments'] =
+                $newFiles;
         }
-    }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | Update / Create Pilot Profile
+        |--------------------------------------------------------------------------
+        */
+
+        $updatedProfile =
+            $pilot->pilotProfile()->updateOrCreate(
+                [
+                    'user_id' => $pilot->id
+                ],
+                $profileData
+            );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Sync Disciplines
+        |--------------------------------------------------------------------------
+        */
+
+        $updatedProfile->disciplines()->sync(
+            $request->disciplines
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Commit
+        |--------------------------------------------------------------------------
+        */
+
+        DB::commit();
+
+
+        return response()->json([
+            'success' => true,
+            'data' => $pilot->load(
+                'pilotProfile.disciplines'
+            )
+        ]);
+
+
+    } catch (\Exception $e) {
+
+        DB::rollBack();
+
+
+        return response()->json([
+            'success' => false,
+            'error' => $e->getMessage()
+        ], 500);
+    }
+}
     public function destroy(User $pilot)
     {
         if ($pilot->is_admin) {
