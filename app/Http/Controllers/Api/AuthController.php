@@ -17,47 +17,205 @@ class AuthController extends Controller
     // Login
 public function login(Request $request)
 {
-    // 1. PILOT LOGIN (License + Phone)
+    // =========================================================
+    // 1. PILOT LOGIN (License Number + Phone)
+    // =========================================================
     if ($request->has('license_number')) {
+
         $request->validate([
             'license_number' => 'required',
-            'phone' => 'required', // Use phone as the "password"
+            'phone' => 'required',
         ]);
 
-        $profile = \App\Models\PilotProfile::where('license_number', $request->license_number)->first();
-        
-        // Verify profile exists and the linked user's phone matches
-        if (
-    !$profile ||
-    !$profile->user ||
-    $profile->user->phone !== $request->phone
-) {
-            return response()->json(['message' => 'License Number or Phone does not match our records.'], 401);
+        Log::info('PILOT LOGIN ATTEMPT', [
+            'license_number' => $request->license_number,
+            'phone' => $request->phone,
+            'ip' => $request->ip(),
+        ]);
+
+        // Find pilot profile
+        $profile = \App\Models\PilotProfile::where(
+            'license_number',
+            $request->license_number
+        )->first();
+
+        // ---------------------------------------------------------
+        // License number not found
+        // ---------------------------------------------------------
+        if (!$profile) {
+
+            Log::warning('PILOT LOGIN FAILED', [
+                'license_number' => $request->license_number,
+                'reason' => 'License number not found',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'License number or phone number is incorrect.',
+            ], 401);
         }
-        
+
+        // ---------------------------------------------------------
+        // Pilot profile exists but user account is missing
+        // ---------------------------------------------------------
+        if (!$profile->user) {
+
+            Log::error('PILOT LOGIN FAILED', [
+                'license_number' => $request->license_number,
+                'profile_id' => $profile->id,
+                'reason' => 'Pilot profile has no linked user account',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Your account is not properly configured. Please contact the administrator.',
+            ], 500);
+        }
+
         $user = $profile->user;
-    } 
-    // 2. ADMIN LOGIN (Standard Email + Password)
+
+        // ---------------------------------------------------------
+        // Phone does not match
+        // ---------------------------------------------------------
+        if ($user->phone !== $request->phone) {
+
+            Log::warning('PILOT LOGIN FAILED', [
+                'pilot_id' => $user->id,
+                'license_number' => $request->license_number,
+                'reason' => 'Phone number does not match',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'License number or phone number is incorrect.',
+            ], 401);
+        }
+
+        // ---------------------------------------------------------
+        // Pilot credentials are correct
+        // ---------------------------------------------------------
+        Log::info('PILOT CREDENTIALS VERIFIED', [
+            'pilot_id' => $user->id,
+            'pilot_name' => $user->name,
+            'license_number' => $profile->license_number,
+            'ip' => $request->ip(),
+        ]);
+    }
+
+    // =========================================================
+    // 2. ADMIN / STAFF LOGIN (Email + Password)
+    // =========================================================
     else {
+
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
+        Log::info('ADMIN LOGIN ATTEMPT', [
+            'email' => $request->email,
+            'ip' => $request->ip(),
+        ]);
+
         $user = User::where('email', $request->email)->first();
-        if (!$user || ! Hash::check($request->password, $user->password)) {
-            return response()->json(['message' => 'Admin credentials invalid'], 401);
+
+        // ---------------------------------------------------------
+        // Email doesn't exist
+        // ---------------------------------------------------------
+        if (!$user) {
+
+            Log::warning('ADMIN LOGIN FAILED', [
+                'email' => $request->email,
+                'reason' => 'Email not found',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Email or password is incorrect.',
+            ], 401);
         }
+
+        // ---------------------------------------------------------
+        // Password incorrect
+        // ---------------------------------------------------------
+        if (!Hash::check($request->password, $user->password)) {
+
+            Log::warning('ADMIN LOGIN FAILED', [
+                'user_id' => $user->id,
+                'email' => $request->email,
+                'reason' => 'Incorrect password',
+                'ip' => $request->ip(),
+            ]);
+
+            return response()->json([
+                'message' => 'Email or password is incorrect.',
+            ], 401);
+        }
+
+        Log::info('ADMIN CREDENTIALS VERIFIED', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'ip' => $request->ip(),
+        ]);
     }
-if (!$user->is_admin && !$user->is_approved) {
 
-    return response()->json([
-        'message' => 'Your membership application is awaiting administrator approval.'
-    ], 403);
+    // =========================================================
+    // 3. APPROVAL CHECK
+    // =========================================================
 
-}
+    if (!$user->is_admin && !$user->is_approved) {
 
-    $token = $user->createToken('api-token')->plainTextToken;
+        Log::warning('LOGIN BLOCKED - ACCOUNT NOT APPROVED', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'license_number' => $user->pilotProfile?->license_number,
+            'reason' => 'Account is not approved',
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'message' => 'Your membership application is awaiting administrator approval.',
+        ], 403);
+    }
+
+    // =========================================================
+    // 4. CREATE SANCTUM TOKEN
+    // =========================================================
+
+    try {
+
+        $token = $user->createToken('api-token')->plainTextToken;
+
+    } catch (\Throwable $e) {
+
+        Log::error('LOGIN TOKEN CREATION FAILED', [
+            'user_id' => $user->id,
+            'email' => $user->email,
+            'error' => $e->getMessage(),
+            'ip' => $request->ip(),
+        ]);
+
+        return response()->json([
+            'message' => 'Unable to complete login at the moment. Please try again.',
+        ], 500);
+    }
+
+    // =========================================================
+    // 5. SUCCESS
+    // =========================================================
+
+    Log::info(
+        $request->has('license_number')
+            ? 'PILOT LOGIN SUCCESS'
+            : 'ADMIN LOGIN SUCCESS',
+        [
+            'user_id' => $user->id,
+            'user_name' => $user->name,
+            'email' => $user->email,
+            'license_number' => $user->pilotProfile?->license_number,
+            'ip' => $request->ip(),
+        ]
+    );
 
     return response()->json([
         'user' => $user->load('pilotProfile'),
