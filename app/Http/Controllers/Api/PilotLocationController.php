@@ -20,6 +20,13 @@ class PilotLocationController extends Controller
      */
  public function update(Request $request)
 {
+    \Log::info('GPS UPDATE RECEIVED', [
+    'user_id' => auth()->id(),
+    'latitude' => $request->latitude,
+    'longitude' => $request->longitude,
+    'accuracy' => $request->accuracy,
+    'time' => now()->toDateTimeString(),
+]);
     $request->validate([
         'latitude' => 'required|numeric',
         'longitude' => 'required|numeric',
