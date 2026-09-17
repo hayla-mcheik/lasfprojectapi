@@ -15,18 +15,36 @@ class AirspaceSession extends Model
         'status',
     ];
 
+    /**
+     * Flying location of this session.
+     */
     public function location()
     {
-        return $this->belongsTo(FlyingLocation::class, 'flying_location_id');
+        return $this->belongsTo(
+            FlyingLocation::class,
+            'flying_location_id'
+        );
     }
 
+    /**
+     * Pilot who owns this session.
+     */
     public function pilot()
     {
-        return $this->belongsTo(User::class, 'pilot_id');
+        return $this->belongsTo(
+            User::class,
+            'pilot_id'
+        );
     }
 
-public function locations()
-{
-    return $this->hasMany(PilotLocation::class, 'airspace_session_id');
-}
+    /**
+     * All GPS locations recorded during this session.
+     */
+    public function locations()
+    {
+        return $this->hasMany(
+            PilotLocation::class,
+            'airspace_session_id'
+        );
+    }
 }
