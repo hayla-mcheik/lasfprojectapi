@@ -18,173 +18,95 @@ class PilotLocationController extends Controller
      *
      * Called by the pilot's phone whenever a new GPS position is available.
      */
-    public function update(Request $request)
-    {
-        $request->validate([
-            'latitude' => 'required|numeric',
-            'longitude' => 'required|numeric',
-            'accuracy' => 'nullable|numeric',
+ public function update(Request $request)
+{
+    $request->validate([
+        'latitude' => 'required|numeric',
+        'longitude' => 'required|numeric',
+        'accuracy' => 'nullable|numeric',
+    ]);
+
+    \Log::info('========== GPS UPDATE RECEIVED ==========', [
+        'user_id' => auth()->id(),
+        'latitude' => $request->latitude,
+        'longitude' => $request->longitude,
+        'accuracy' => $request->accuracy,
+        'time' => now()->toDateTimeString(),
+    ]);
+
+    /*
+    |--------------------------------------------------------------------------
+    | Find active airspace session
+    |--------------------------------------------------------------------------
+    */
+
+    $session = AirspaceSession::where('pilot_id', auth()->id())
+        ->where('status', 'active')
+        ->whereNull('checked_out_at')
+        ->where('expires_at', '>', now())
+        ->latest('checked_in_at')
+        ->first();
+
+    if (!$session) {
+
+        \Log::warning('GPS UPDATE REJECTED - NO ACTIVE SESSION', [
+            'user_id' => auth()->id(),
         ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Find active Airspace session
-        |--------------------------------------------------------------------------
-        */
-
-        $session = AirspaceSession::where(
-                'pilot_id',
-                auth()->id()
-            )
-            ->where('status', 'active')
-            ->whereNull('checked_out_at')
-            ->where('expires_at', '>', now())
-            ->latest('checked_in_at')
-            ->first();
-
-        /*
-        |--------------------------------------------------------------------------
-        | Cross Country session
-        |--------------------------------------------------------------------------
-        |
-        | Your current implementation does not yet have a Cross Country
-        | session lookup, so this remains null.
-        |
-        */
-
-        $crossCountrySession = null;
-
-        /*
-        |--------------------------------------------------------------------------
-        | No active flight
-        |--------------------------------------------------------------------------
-        */
-
-        if (!$session && !$crossCountrySession) {
-            return response()->json([
-                'success' => false,
-                'message' => 'No active flight session.',
-            ], 422);
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Check whether pilot is outside authorized flying zone
-        |--------------------------------------------------------------------------
-        */
-
-        $isOutsideZone = false;
-
-        if ($session) {
-
-            $allowedLocation = $this->findCurrentFlyingLocation(
-                (float) $request->latitude,
-                (float) $request->longitude
-            );
-
-            if (
-                !$allowedLocation ||
-                $allowedLocation->id !== $session->flying_location_id
-            ) {
-                $isOutsideZone = true;
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Save GPS position
-        |--------------------------------------------------------------------------
-        |
-        | IMPORTANT:
-        | We create a NEW GPS record.
-        |
-        | This allows us to keep the complete flight path.
-        |
-        */
-
-        $location = PilotLocation::create([
-            'pilot_id' => auth()->id(),
-
-            'airspace_session_id' => $session?->id,
-
-            'cross_country_session_id' => $crossCountrySession?->id,
-
-            'latitude' => (float) $request->latitude,
-
-            'longitude' => (float) $request->longitude,
-
-            'accuracy' => $request->accuracy,
-
-            'is_outside_zone' => $isOutsideZone,
-        ]);
-
-        /*
-        |--------------------------------------------------------------------------
-        | Update Cross Country current location
-        |--------------------------------------------------------------------------
-        */
-
-        if ($crossCountrySession) {
-
-            $currentLocation = $this->findCurrentFlyingLocation(
-                (float) $request->latitude,
-                (float) $request->longitude
-            );
-
-            if (
-                $currentLocation &&
-                $crossCountrySession->current_location_id !==
-                    $currentLocation->id
-            ) {
-
-                $crossCountrySession->update([
-                    'current_location_id' => $currentLocation->id,
-                ]);
-
-                $crossCountrySession->refresh();
-            }
-        }
-
-        /*
-        |--------------------------------------------------------------------------
-        | Return saved GPS
-        |--------------------------------------------------------------------------
-        */
 
         return response()->json([
-            'success' => true,
-
-            'location' => [
-                'id' => $location->id,
-
-                'pilot_id' => $location->pilot_id,
-
-                'airspace_session_id' =>
-                    $location->airspace_session_id,
-
-                'cross_country_session_id' =>
-                    $location->cross_country_session_id,
-
-                'latitude' => (float) $location->latitude,
-
-                'longitude' => (float) $location->longitude,
-
-                'accuracy' => $location->accuracy,
-
-                'is_outside_zone' =>
-                    (bool) $location->is_outside_zone,
-
-                'created_at' => $location->created_at,
-            ],
-
-            'outside_zone' => $isOutsideZone,
-
-            'message' => $isOutsideZone
-                ? 'You are outside the authorized flying zone.'
-                : null,
-        ]);
+            'message' => 'No active flight session.'
+        ], 422);
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Check flying zone
+    |--------------------------------------------------------------------------
+    */
+
+    $allowedLocation = $this->findCurrentFlyingLocation(
+        (float) $request->latitude,
+        (float) $request->longitude
+    );
+
+    $isOutsideZone =
+        !$allowedLocation ||
+        $allowedLocation->id !== $session->flying_location_id;
+
+    /*
+    |--------------------------------------------------------------------------
+    | Save GPS
+    |--------------------------------------------------------------------------
+    */
+
+    $location = PilotLocation::create([
+        'pilot_id' => auth()->id(),
+        'airspace_session_id' => $session->id,
+        'latitude' => $request->latitude,
+        'longitude' => $request->longitude,
+        'accuracy' => $request->accuracy,
+        'is_outside_zone' => $isOutsideZone,
+    ]);
+
+    \Log::info('========== GPS SAVED ==========', [
+        'location_id' => $location->id,
+        'session_id' => $session->id,
+        'pilot_id' => auth()->id(),
+        'latitude' => $location->latitude,
+        'longitude' => $location->longitude,
+        'outside_zone' => $isOutsideZone,
+        'created_at' => $location->created_at?->toDateTimeString(),
+    ]);
+
+    return response()->json([
+        'success' => true,
+        'location' => $location,
+        'outside_zone' => $isOutsideZone,
+        'message' => $isOutsideZone
+            ? 'You are outside the authorized flying zone.'
+            : null,
+    ]);
+}
 
     /**
      * =========================================================================
