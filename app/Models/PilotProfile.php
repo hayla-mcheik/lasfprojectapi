@@ -14,6 +14,7 @@ class PilotProfile extends Model
     // Define fillable parameters ensuring 'license_number' stays untouched
     protected $fillable = [
         'user_id',
+        'is_international',
         'license_number', // Exact Excel table naming convention preserved
         'blood_type',
         'ratings',
@@ -37,23 +38,12 @@ class PilotProfile extends Model
      * Cast JSON array blocks back to PHP arrays automatically.
      */
 protected $casts = [
-
-    'ratings' => 'array',
-
-    // 'disciplines' => 'array',
-
-    'licenses_attachments' => 'array',
-
-    'valid_until' => 'date',
-
+    'is_international' => 'boolean',
     'date_of_birth' => 'date',
-
-    'ban_until' => 'date',
-
-    'is_banned' => 'boolean',
-
+    'valid_until' => 'date',
+    'ratings' => 'array',
+    'licenses_attachments' => 'array',
 ];
-
     /**
      * Relationship with the core User account.
      */
@@ -82,5 +72,9 @@ protected $casts = [
     }
 
     return now()->lte($this->ban_until);
+}
+public function internationalDetails()
+{
+    return $this->hasOne(InternationalPilotDetail::class);
 }
 }

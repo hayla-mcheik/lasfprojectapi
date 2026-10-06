@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Log;
-
+use Barryvdh\DomPDF\Facade\Pdf;
 class PilotController extends Controller
 {
     public function index(Request $request)
@@ -730,54 +730,529 @@ public function reject(User $pilot)
     ]);
 }
 
+public function export(Request $request)
+{
+    /*
+    |--------------------------------------------------------------------------
+    | Load ALL pilots with complete information
+    |--------------------------------------------------------------------------
+    */
 
-    public function export(Request $request)
-    {
-        // Updated relation tracking keyword to use camelCase: pilotProfile
-        $pilots = User::with(['pilotProfile'])->where('is_admin', false)->get();
-        
-        $fileName = 'pilots_registry_export_' . date('Y-m-d') . '.csv';
-        $headers = [
-            "Content-type"        => "text/csv",
-            "Content-Disposition" => "attachment; filename=$fileName",
-            "Pragma"              => "no-cache",
-            "Cache-Control"       => "must-revalidate, post-check=0, pre-check=0",
-            "Expires"             => "0"
-        ];
+    $pilots = User::with([
+        'pilotProfile',
+        'pilotProfile.disciplines',
+        'pilotProfile.internationalDetails',
+    ])
+        ->where('is_admin', false)
+        ->get();
 
-        $columns = ['Name', 'Email', 'Phone', 'Member License Number', 'Blood Type', 'Ratings', 'Insurance Provider', 'Insurance Number', 'Club Name', 'Club Code', 'Designation', 'Facebook', 'Instagram', 'Valid Until', 'Status'];
 
-        $callback = function() use($pilots, $columns) {
-            $file = fopen('php://output', 'w');
-            fputcsv($file, $columns);
+    /*
+    |--------------------------------------------------------------------------
+    | CSV filename
+    |--------------------------------------------------------------------------
+    */
 
-            foreach ($pilots as $pilot) {
-                // Updated structural property check to use camelCase: pilotProfile
-                $prof = $pilot->pilotProfile;
-                fputcsv($file, [
-                    $pilot->name,
-                    $pilot->email,
-                    $pilot->phone,
-                    $prof->license_number ?? 'Pending',
-                    $prof->blood_type ?? 'N/A',
-                    $prof->ratings ?? 'None',
-                    $prof->insurance_provider ?? 'N/A',
-                    $prof->insurance_number ?? 'N/A',
-                    $prof->club_name ?? 'N/A',
-                    $prof->club_code ?? 'N/A',
-                    $prof->designation ?? 'Professional Pilot',
-                    $prof->facebook_url ?? '',
-                    $prof->instagram_url ?? '',
-                    $prof ? ($prof->valid_until ? $prof->valid_until->format('d/m/Y') : '') : '',
-                    $pilot->is_active ? 'Active' : 'Inactive',
-                ]);
+    $fileName =
+        'lasf_all_pilots_export_' .
+        date('Y-m-d') .
+        '.csv';
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSV response headers
+    |--------------------------------------------------------------------------
+    */
+
+    $headers = [
+        'Content-Type' => 'text/csv; charset=UTF-8',
+
+        'Content-Disposition' =>
+            'attachment; filename="' . $fileName . '"',
+
+        'Pragma' => 'no-cache',
+
+        'Cache-Control' =>
+            'must-revalidate, post-check=0, pre-check=0',
+
+        'Expires' => '0',
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CSV columns
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    | No uploaded document/file paths are exported.
+    |
+    */
+
+    $columns = [
+
+        /*
+        |--------------------------------------------------------------------------
+        | LASF / Account Information
+        |--------------------------------------------------------------------------
+        */
+
+        'Pilot ID',
+        'Full Name',
+        'Email',
+        'Phone',
+
+        'Registration Type',
+
+        'License Number',
+        'Date of Birth',
+        'Blood Type',
+        'Ratings',
+        'Disciplines',
+
+        'Insurance Provider',
+        'Insurance Number',
+
+        'Club Name',
+        'Club Code',
+        'Designation',
+
+        'Facebook',
+        'Instagram',
+
+        'Valid Until',
+
+        'Active Status',
+        'Approved',
+        'Registered At',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | International / Visitor Information
+        |--------------------------------------------------------------------------
+        */
+
+        'First Name',
+        'Father Name',
+        'Last Name',
+        'Mother Full Name',
+        'Wife Full Name',
+
+        'Place of Birth',
+        'Nationality',
+        'Sex',
+        'Marital Status',
+        'Languages',
+
+        'National ID Number',
+        'File Number',
+
+        'Passport Number',
+        'Passport Issuing Authority',
+        'Passport Issued Date',
+        'Passport Expiry Date',
+
+        'Mobile Phone',
+        'Alternative Phone',
+
+        'Work Email',
+        'Personal Email',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Current Address
+        |--------------------------------------------------------------------------
+        */
+
+        'Current Country',
+        'Current City',
+        'Current Street/Area',
+        'Current Building',
+        'Current Floor',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Alternative Address
+        |--------------------------------------------------------------------------
+        */
+
+        'Alternative Country',
+        'Alternative City',
+        'Alternative Street/Area',
+        'Alternative Building',
+        'Alternative Floor',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Employment
+        |--------------------------------------------------------------------------
+        */
+
+        'Employer Name',
+        'Current Title',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Criminal Record
+        |--------------------------------------------------------------------------
+        */
+
+        'Convicted Of Crime',
+        'Crime Type',
+        'Crime Date',
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Visitor Certification
+        |--------------------------------------------------------------------------
+        */
+
+        'Visitor Name',
+        'Signature',
+    ];
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Generate CSV
+    |--------------------------------------------------------------------------
+    */
+
+    $callback = function () use ($pilots, $columns) {
+
+        $file = fopen(
+            'php://output',
+            'w'
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | UTF-8 BOM
+        |--------------------------------------------------------------------------
+        |
+        | Helps Excel correctly display Arabic and international characters.
+        |
+        */
+
+        fprintf(
+            $file,
+            chr(0xEF) .
+            chr(0xBB) .
+            chr(0xBF)
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Header row
+        |--------------------------------------------------------------------------
+        */
+
+        fputcsv(
+            $file,
+            $columns
+        );
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | Pilot rows
+        |--------------------------------------------------------------------------
+        */
+
+        foreach ($pilots as $pilot) {
+
+            $profile =
+                $pilot->pilotProfile;
+
+            $international =
+                $profile?->internationalDetails;
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Ratings
+            |--------------------------------------------------------------------------
+            */
+
+            $ratings =
+                $profile?->ratings ?? '';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Disciplines
+            |--------------------------------------------------------------------------
+            */
+
+            $disciplines = '';
+
+            if ($profile?->disciplines) {
+
+                $disciplines =
+                    $profile->disciplines
+                        ->pluck('name')
+                        ->filter()
+                        ->implode(', ');
             }
-            fclose($file);
-        };
 
-        return response()->stream($callback, 200, $headers);
-    }
 
+            /*
+            |--------------------------------------------------------------------------
+            | Registration Type
+            |--------------------------------------------------------------------------
+            */
+
+            $registrationType =
+                $profile?->is_international
+                    ? 'International Pilot'
+                    : 'Normal Pilot';
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Date formatting helper
+            |--------------------------------------------------------------------------
+            */
+
+            $formatDate = function ($date) {
+
+                if (!$date) {
+                    return '';
+                }
+
+                try {
+
+                    return Carbon::parse($date)
+                        ->format('d/m/Y');
+
+                } catch (\Throwable $e) {
+
+                    return '';
+                }
+            };
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Export pilot
+            |--------------------------------------------------------------------------
+            */
+
+            fputcsv(
+                $file,
+                [
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | LASF / Account Information
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $pilot->id,
+
+                    $pilot->name ?? '',
+
+                    $pilot->email ?? '',
+
+                    $pilot->phone ?? '',
+
+                    $registrationType,
+
+                    $profile?->license_number ?? '',
+
+                    $formatDate(
+                        $profile?->date_of_birth
+                    ),
+
+                    $profile?->blood_type ?? '',
+
+                    $ratings,
+
+                    $disciplines,
+
+                    $profile?->insurance_provider ?? '',
+
+                    $profile?->insurance_number ?? '',
+
+                    $profile?->club_name ?? '',
+
+                    $profile?->club_code ?? '',
+
+                    $profile?->designation ?? '',
+
+                    $profile?->facebook_url ?? '',
+
+                    $profile?->instagram_url ?? '',
+
+                    $formatDate(
+                        $profile?->valid_until
+                    ),
+
+                    $pilot->is_active
+                        ? 'Active'
+                        : 'Inactive',
+
+                    $pilot->is_approved
+                        ? 'Yes'
+                        : 'No',
+
+                    $formatDate(
+                        $pilot->created_at
+                    ),
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | International / Visitor Information
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->first_name ?? '',
+
+                    $international?->father_name ?? '',
+
+                    $international?->last_name ?? '',
+
+                    $international?->mother_full_name ?? '',
+
+                    $international?->wife_full_name ?? '',
+
+                    $international?->place_of_birth ?? '',
+
+                    $international?->nationality ?? '',
+
+                    $international?->sex ?? '',
+
+                    $international?->marital_status ?? '',
+
+                    $international?->languages ?? '',
+
+                    $international?->national_id_number ?? '',
+
+                    $international?->file_number ?? '',
+
+                    $international?->passport_number ?? '',
+
+                    $international?->passport_issuing_authority ?? '',
+
+                    $formatDate(
+                        $international?->passport_issued_date
+                    ),
+
+                    $formatDate(
+                        $international?->passport_expiry_date
+                    ),
+
+                    $international?->mobile_phone ?? '',
+
+                    $international?->alternative_phone ?? '',
+
+                    $international?->work_email ?? '',
+
+                    $international?->personal_email ?? '',
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Current Address
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->current_country ?? '',
+
+                    $international?->current_city ?? '',
+
+                    $international?->current_street_area ?? '',
+
+                    $international?->current_building ?? '',
+
+                    $international?->current_floor ?? '',
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Alternative Address
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->alternative_country ?? '',
+
+                    $international?->alternative_city ?? '',
+
+                    $international?->alternative_street_area ?? '',
+
+                    $international?->alternative_building ?? '',
+
+                    $international?->alternative_floor ?? '',
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Employment
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->employer_name ?? '',
+
+                    $international?->current_title ?? '',
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Criminal Record
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->convicted_of_crime
+                        ? 'Yes'
+                        : 'No',
+
+                    $international?->crime_type ?? '',
+
+                    $formatDate(
+                        $international?->crime_date
+                    ),
+
+
+                    /*
+                    |--------------------------------------------------------------------------
+                    | Visitor Certification
+                    |--------------------------------------------------------------------------
+                    */
+
+                    $international?->visitor_name ?? '',
+
+                    $international?->signature ?? '',
+                ]
+            );
+        }
+
+
+        fclose($file);
+    };
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | Return CSV download
+    |--------------------------------------------------------------------------
+    */
+
+    return response()->stream(
+        $callback,
+        200,
+        $headers
+    );
+}
     public function import(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -901,5 +1376,46 @@ public function downloadLicense(User $pilot, $index)
     }
 
     return Storage::disk('public')->download($files[$index]);
+}
+public function visitorCard(User $pilot)
+{
+    $pilot->load([
+        'pilotProfile',
+        'pilotProfile.disciplines',
+        'pilotProfile.internationalDetails',
+    ]);
+
+    $profile = $pilot->pilotProfile;
+
+    if (!$profile) {
+        abort(404, 'Pilot profile not found.');
+    }
+
+    if (!$profile->is_international) {
+        abort(404, 'Visitor card is only available for international pilots.');
+    }
+
+    $international = $profile->internationalDetails;
+
+    if (!$international) {
+        abort(404, 'International pilot information not found.');
+    }
+
+    $pdf = Pdf::loadView(
+        'admin.pilots.visitor-card',
+        [
+            'pilot' => $pilot,
+            'profile' => $profile,
+            'international' => $international,
+        ]
+    );
+
+    $pdf->setPaper('A4', 'portrait');
+
+    return $pdf->download(
+        'visitor-information-card-' .
+        $profile->license_number .
+        '.pdf'
+    );
 }
 }

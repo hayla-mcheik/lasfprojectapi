@@ -224,36 +224,281 @@ public function login(Request $request)
 }
     // Register (Pilot)
 
+// Register (Pilot)
 public function register(Request $request)
 {
+    /*
+    |--------------------------------------------------------------------------
+    | 1. Determine registration type
+    |--------------------------------------------------------------------------
+    |
+    | Normal pilot:
+    | is_international = false / 0
+    |
+    | International pilot:
+    | is_international = true / 1
+    |
+    */
+
+    $isInternational = $request->boolean('is_international');
+
+    /*
+    |--------------------------------------------------------------------------
+    | 2. Validation
+    |--------------------------------------------------------------------------
+    */
+
     try {
 
         $request->validate([
+
+            /*
+            |--------------------------------------------------------------------------
+            | Common LASF account information
+            |--------------------------------------------------------------------------
+            */
+
             'name' => 'required|string|max:255',
+
             'email' => 'required|email|unique:users,email',
+
             'password' => 'required|min:6|confirmed',
+
             'phone' => 'required|string|max:20',
 
-            'blood_type' => 'required',
-            'club_name' => 'required',
-            'club_code' => 'required',
+            'blood_type' => 'required|string|max:20',
 
-            'insurance_provider' => 'nullable|string',
-            'insurance_number' => 'nullable|string',
+            'ratings' => 'required|array|min:1',
 
-            'ratings' => 'required|array',
-            'disciplines' => 'required|array',
+            'disciplines' => 'required|array|min:1',
 
-            'date_of_birth' => 'nullable|date|before:today',
+  'date_of_birth' => [
+    'nullable',
+    'date',
+    'before:today',
+],
 
-            'image' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:2048',
-            'license_attachment' => 'nullable|file|mimes:pdf,jpg,jpeg,png,webp|max:5120',
+            'image' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+
+            'license_attachment' => [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:5120',
+            ],
+
+            'insurance_provider' => 'nullable|string|max:255',
+
+            'insurance_number' => 'nullable|string|max:255',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Club
+            |--------------------------------------------------------------------------
+            |
+            | Lebanese pilots must provide club code.
+            | International pilots can use their foreign club name.
+            |
+            */
+
+            'club_name' => 'required|string|max:255',
+
+            'club_code' => $isInternational
+                ? 'nullable|string|max:10'
+                : 'required|string|max:10',
+
+            /*
+            |--------------------------------------------------------------------------
+            | International Pilot Information
+            |--------------------------------------------------------------------------
+            */
+
+            'first_name' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'father_name' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'last_name' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'mother_full_name' => 'nullable|string|max:255',
+
+            'wife_full_name' => 'nullable|string|max:255',
+
+            'place_of_birth' => $isInternational
+                ? 'nullable|string|max:255'
+                : 'nullable|string|max:255',
+
+            'nationality' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'sex' => $isInternational
+                ? 'required|string|max:50'
+                : 'nullable|string|max:50',
+
+            'marital_status' => $isInternational
+                ? 'required|string|max:100'
+                : 'nullable|string|max:100',
+
+            'languages' => $isInternational
+                ? 'required|string|max:500'
+                : 'nullable|string|max:500',
+
+            'national_id_number' => 'nullable|string|max:255',
+
+            'file_number' => 'nullable|string|max:255',
+
+            'passport_number' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'passport_issuing_authority' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'passport_issued_date' => $isInternational
+                ? 'required|date'
+                : 'nullable|date',
+
+            'passport_expiry_date' => $isInternational
+                ? 'required|date|after:passport_issued_date'
+                : 'nullable|date',
+
+            'mobile_phone' => 'nullable|string|max:50',
+
+            'alternative_phone' => 'nullable|string|max:50',
+
+            'work_email' => 'nullable|email|max:255',
+
+            'personal_email' => 'nullable|email|max:255',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Current Address
+            |--------------------------------------------------------------------------
+            */
+
+            'current_country' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'current_city' => $isInternational
+                ? 'required|string|max:255'
+                : 'nullable|string|max:255',
+
+            'current_street_area' => 'nullable|string|max:255',
+
+            'current_building' => 'nullable|string|max:255',
+
+            'current_floor' => 'nullable|string|max:100',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Alternative Address
+            |--------------------------------------------------------------------------
+            */
+
+            'alternative_country' => 'nullable|string|max:255',
+
+            'alternative_city' => 'nullable|string|max:255',
+
+            'alternative_street_area' => 'nullable|string|max:255',
+
+            'alternative_building' => 'nullable|string|max:255',
+
+            'alternative_floor' => 'nullable|string|max:100',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Employment
+            |--------------------------------------------------------------------------
+            */
+
+            'employer_name' => 'nullable|string|max:255',
+
+            'current_title' => 'nullable|string|max:255',
+
+            /*
+            |--------------------------------------------------------------------------
+            | Criminal Record
+            |--------------------------------------------------------------------------
+            */
+
+        'convicted_of_crime' => 'nullable|boolean',
+
+'crime_type' => 'nullable|string|max:1000',
+
+'crime_date' => 'nullable|date',
+'visitor_name' => 'nullable|string|max:255',
+            /*
+            |--------------------------------------------------------------------------
+            | International documents
+            |--------------------------------------------------------------------------
+            */
+
+            'passport_document' => [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:10240',
+            ],
+
+            'national_id_document' => [
+                'nullable',
+                'file',
+                'mimes:pdf,jpg,jpeg,png,webp',
+                'max:10240',
+            ],
+
+            'signature' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'max:5120',
+            ],
+
         ], [
-            'email.unique' => 'This email is already registered.',
-            'password.confirmed' => 'Password confirmation does not match.',
-            'date_of_birth.before' => 'Date of birth must be before today.',
-            'ratings.required' => 'Please select at least one rating.',
-            'disciplines.required' => 'Please select at least one discipline.',
+
+            'email.unique' =>
+                'This email is already registered.',
+
+            'password.confirmed' =>
+                'Password confirmation does not match.',
+
+            'date_of_birth.before' =>
+                'Date of birth must be before today.',
+
+            'passport_expiry_date.after' =>
+                'Passport expiry date must be after the passport issued date.',
+
+            'ratings.required' =>
+                'Please select at least one rating.',
+
+            'disciplines.required' =>
+                'Please select at least one discipline.',
+
+            'passport_number.required' =>
+                'Passport number is required for international pilots.',
+
+            'passport_issuing_authority.required' =>
+                'Passport issuing authority is required for international pilots.',
+
+            'passport_issued_date.required' =>
+                'Passport issued date is required for international pilots.',
+
+            'passport_expiry_date.required' =>
+                'Passport expiry date is required for international pilots.',
+
         ]);
 
     } catch (\Illuminate\Validation\ValidationException $e) {
@@ -261,47 +506,130 @@ public function register(Request $request)
         return response()->json([
             'success' => false,
             'message' => 'Validation failed',
-            'errors' => $e->errors()
+            'errors' => $e->errors(),
         ], 422);
     }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | 3. Start database transaction
+    |--------------------------------------------------------------------------
+    */
 
     DB::beginTransaction();
 
     try {
 
+        /*
+        |--------------------------------------------------------------------------
+        | 4. Create User
+        |--------------------------------------------------------------------------
+        */
+
         $user = User::create([
+
             'name' => $request->name,
+
             'email' => $request->email,
+
             'phone' => $request->phone,
+
             'password' => Hash::make($request->password),
 
             'is_admin' => false,
+
             'is_active' => false,
+
             'is_approved' => false,
+
         ]);
-$currentYear = now()->format('y');
 
-$clubCode = str_pad($request->club_code, 2, '0', STR_PAD_LEFT);
 
-$lastLicense = PilotProfile::where('club_code', $clubCode)
-    ->where('license_number', 'like', $currentYear . '-' . $clubCode . '-%')
-    ->orderBy('id', 'desc')
-    ->value('license_number');
+        /*
+        |--------------------------------------------------------------------------
+        | 5. Generate LASF License Number
+        |--------------------------------------------------------------------------
+        |
+        | Normal Lebanese pilot:
+        |
+        | 26-01-0001
+        |
+        | International pilot:
+        |
+        | 26-99-0001
+        |
+        | 99 is reserved for international pilots.
+        |
+        */
 
-if ($lastLicense) {
+        $currentYear = now()->format('y');
 
-    $parts = explode('-', $lastLicense);
+        if ($isInternational) {
 
-    $lastSequence = (int) $parts[2];
+            // Reserved club code for international pilots
+            $clubCode = '99';
 
-    $sequence = str_pad($lastSequence + 1, 4, '0', STR_PAD_LEFT);
+        } else {
 
-} else {
+            $clubCode = str_pad(
+                $request->club_code,
+                2,
+                '0',
+                STR_PAD_LEFT
+            );
+        }
 
-    $sequence = '0001';
-}
 
-$licenseNumber = "{$currentYear}-{$clubCode}-{$sequence}";
+        /*
+        |--------------------------------------------------------------------------
+        | 6. Find last license number
+        |--------------------------------------------------------------------------
+        */
+
+        $lastLicense = PilotProfile::where(
+            'club_code',
+            $clubCode
+        )
+            ->where(
+                'license_number',
+                'like',
+                $currentYear . '-' . $clubCode . '-%'
+            )
+            ->orderBy('id', 'desc')
+            ->value('license_number');
+
+
+        if ($lastLicense) {
+
+            $parts = explode('-', $lastLicense);
+
+            $lastSequence = isset($parts[2])
+                ? (int) $parts[2]
+                : 0;
+
+            $sequence = str_pad(
+                $lastSequence + 1,
+                4,
+                '0',
+                STR_PAD_LEFT
+            );
+
+        } else {
+
+            $sequence = '0001';
+        }
+
+
+        $licenseNumber =
+            "{$currentYear}-{$clubCode}-{$sequence}";
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 7. Upload Pilot Image
+        |--------------------------------------------------------------------------
+        */
 
         $imagePath = null;
 
@@ -315,67 +643,373 @@ $licenseNumber = "{$currentYear}-{$clubCode}-{$sequence}";
             $imagePath = '/storage/' . $imagePath;
         }
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | 8. Upload LASF License
+        |--------------------------------------------------------------------------
+        */
+
         $licenseAttachment = null;
 
-if ($request->hasFile('license_attachment')) {
+        if ($request->hasFile('license_attachment')) {
 
-    $licenseAttachment = $request->file('license_attachment')->store(
-        'pilots/licenses',
-        'public'
-    );
+            $licenseAttachment = $request->file(
+                'license_attachment'
+            )->store(
+                'pilots/licenses',
+                'public'
+            );
 
-    $licenseAttachment = '/storage/' . $licenseAttachment;
-}
+            $licenseAttachment =
+                '/storage/' . $licenseAttachment;
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 9. Create Pilot Profile
+        |--------------------------------------------------------------------------
+        */
 
         $profile = PilotProfile::create([
+
             'user_id' => $user->id,
+
+            'is_international' => $isInternational,
+
             'license_number' => $licenseNumber,
 
             'date_of_birth' => $request->date_of_birth,
 
             'blood_type' => $request->blood_type,
-            'ratings' => implode(' | ', $request->ratings ?? []),
 
-            'insurance_provider' => $request->insurance_provider,
-            'insurance_number' => $request->insurance_number,
+            'ratings' => implode(
+                ' | ',
+                $request->ratings ?? []
+            ),
 
-            'club_name' => $request->club_name,
-            'club_code' => $clubCode,
+            'insurance_provider' =>
+                $request->insurance_provider,
+
+            'insurance_number' =>
+                $request->insurance_number,
+
+            'club_name' =>
+                $request->club_name,
+
+            'club_code' =>
+                $clubCode,
 
             'designation' => 'Pilot',
-            'valid_until' => now()->addYear(),
+
+            'valid_until' =>
+                now()->addYear(),
 
             'image' => $imagePath,
-          'licenses_attachments' => $licenseAttachment
-    ? [$licenseAttachment]
-    : null,
+
+            'licenses_attachments' =>
+                $licenseAttachment
+                    ? [$licenseAttachment]
+                    : null,
+
         ]);
 
-        if ($request->disciplines) {
-            $profile->disciplines()->sync($request->disciplines);
-        }
 
         /*
         |--------------------------------------------------------------------------
-        | Email Admin
+        | 10. Attach Disciplines
+        |--------------------------------------------------------------------------
+        */
+
+        if ($request->disciplines) {
+
+            $profile->disciplines()->sync(
+                $request->disciplines
+            );
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 11. International Pilot Details
+        |--------------------------------------------------------------------------
+        */
+
+        if ($isInternational) {
+
+            /*
+            |--------------------------------------------------------------------------
+            | Upload Passport Document
+            |--------------------------------------------------------------------------
+            */
+
+            $passportDocumentPath = null;
+
+            if ($request->hasFile('passport_document')) {
+
+                $passportDocumentPath =
+                    $request->file(
+                        'passport_document'
+                    )->store(
+                        'pilots/international/passports',
+                        'public'
+                    );
+
+                $passportDocumentPath =
+                    '/storage/' . $passportDocumentPath;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Upload National ID
+            |--------------------------------------------------------------------------
+            */
+
+            $nationalIdDocumentPath = null;
+
+            if ($request->hasFile('national_id_document')) {
+
+                $nationalIdDocumentPath =
+                    $request->file(
+                        'national_id_document'
+                    )->store(
+                        'pilots/international/national-ids',
+                        'public'
+                    );
+
+                $nationalIdDocumentPath =
+                    '/storage/' . $nationalIdDocumentPath;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Upload Signature
+            |--------------------------------------------------------------------------
+            */
+
+            $signaturePath = null;
+
+            if ($request->hasFile('signature')) {
+
+                $signaturePath =
+                    $request->file(
+                        'signature'
+                    )->store(
+                        'pilots/international/signatures',
+                        'public'
+                    );
+
+                $signaturePath =
+                    '/storage/' . $signaturePath;
+            }
+
+
+            /*
+            |--------------------------------------------------------------------------
+            | Create International Details
+            |--------------------------------------------------------------------------
+            */
+
+            $profile->internationalDetails()->create([
+
+                'first_name' =>
+                    $request->first_name,
+
+                'father_name' =>
+                    $request->father_name,
+
+                'last_name' =>
+                    $request->last_name,
+
+                'mother_full_name' =>
+                    $request->mother_full_name,
+
+                'wife_full_name' =>
+                    $request->wife_full_name,
+
+                /*
+                | Use the same DOB as the normal LASF profile
+                */
+                'date_of_birth' =>
+                    $request->date_of_birth,
+
+                'place_of_birth' =>
+                    $request->place_of_birth,
+
+                'nationality' =>
+                    $request->nationality,
+
+                'sex' =>
+                    $request->sex,
+
+                'marital_status' =>
+                    $request->marital_status,
+
+                'languages' =>
+                    $request->languages,
+
+                'national_id_number' =>
+                    $request->national_id_number,
+
+                'file_number' =>
+                    $request->file_number,
+
+                'passport_number' =>
+                    $request->passport_number,
+
+                'passport_issuing_authority' =>
+                    $request->passport_issuing_authority,
+
+                'passport_issued_date' =>
+                    $request->passport_issued_date,
+
+                'passport_expiry_date' =>
+                    $request->passport_expiry_date,
+
+                'mobile_phone' =>
+                    $request->mobile_phone,
+
+                'alternative_phone' =>
+                    $request->alternative_phone,
+
+                'work_email' =>
+                    $request->work_email,
+
+                'personal_email' =>
+                    $request->personal_email,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Current Address
+                |--------------------------------------------------------------------------
+                */
+
+                'current_country' =>
+                    $request->current_country,
+
+                'current_city' =>
+                    $request->current_city,
+
+                'current_street_area' =>
+                    $request->current_street_area,
+
+                'current_building' =>
+                    $request->current_building,
+
+                'current_floor' =>
+                    $request->current_floor,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Alternative Address
+                |--------------------------------------------------------------------------
+                */
+
+                'alternative_country' =>
+                    $request->alternative_country,
+
+                'alternative_city' =>
+                    $request->alternative_city,
+
+                'alternative_street_area' =>
+                    $request->alternative_street_area,
+
+                'alternative_building' =>
+                    $request->alternative_building,
+
+                'alternative_floor' =>
+                    $request->alternative_floor,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Employment
+                |--------------------------------------------------------------------------
+                */
+
+                'employer_name' =>
+                    $request->employer_name,
+
+                'current_title' =>
+                    $request->current_title,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Criminal Record
+                |--------------------------------------------------------------------------
+                */
+
+                'convicted_of_crime' =>
+                    $request->boolean('convicted_of_crime'),
+
+                'crime_type' =>
+                    $request->crime_type,
+
+'crime_date' =>
+    $request->crime_date,
+
+'visitor_name' =>
+    $request->visitor_name,
+
+                /*
+                |--------------------------------------------------------------------------
+                | Uploaded Documents
+                |--------------------------------------------------------------------------
+                */
+
+                'passport_document' =>
+                    $passportDocumentPath,
+
+                'national_id_document' =>
+                    $nationalIdDocumentPath,
+
+                'signature' =>
+                    $signaturePath,
+
+            ]);
+        }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 12. Email Admin
         |--------------------------------------------------------------------------
         */
 
         try {
 
             \Mail::raw(
+
                 "New LASF Membership Request\n\n" .
+
                 "Name: {$user->name}\n" .
+
                 "Email: {$user->email}\n" .
+
                 "Phone: {$user->phone}\n" .
+
                 "License Number: {$licenseNumber}\n" .
-                "Club: {$request->club_name}\n\n" .
+
+                "Club: {$request->club_name}\n" .
+
+                "Pilot Type: " .
+                ($isInternational
+                    ? 'International Pilot'
+                    : 'Lebanese Pilot') .
+                "\n\n" .
+
                 "This member is waiting for approval.",
+
                 function ($message) use ($user) {
 
-                    $message->to('mikel.c.khalil@gmail.com')
-                        ->subject('New LASF Membership Request - ' . $user->name);
-
+                    $message
+                        ->to('mikel.c.khalil@gmail.com')
+                        ->subject(
+                            'New LASF Membership Request - ' .
+                            $user->name
+                        );
                 }
             );
 
@@ -385,28 +1019,38 @@ if ($request->hasFile('license_attachment')) {
                 'Admin email failed: ' .
                 $mailError->getMessage()
             );
-
         }
+
 
         /*
         |--------------------------------------------------------------------------
-        | Email Pilot Confirmation
+        | 13. Email Pilot Confirmation
         |--------------------------------------------------------------------------
         */
 
         try {
 
             \Mail::raw(
+
                 "Dear {$user->name},\n\n" .
+
                 "Thank you for registering with LASF.\n\n" .
-                "Your membership application has been received and is awaiting administrator approval.\n\n" .
+
+                "Your membership application has been received " .
+                "and is awaiting administrator approval.\n\n" .
+
                 "License Number: {$licenseNumber}\n\n" .
-                "You will be able to login once your account has been approved by the administrator.",
+
+                "You will be able to login once your account " .
+                "has been approved by the administrator.",
+
                 function ($message) use ($user) {
 
-                    $message->to($user->email)
-                        ->subject('LASF Registration Received');
-
+                    $message
+                        ->to($user->email)
+                        ->subject(
+                            'LASF Registration Received'
+                        );
                 }
             );
 
@@ -416,25 +1060,75 @@ if ($request->hasFile('license_attachment')) {
                 'Pilot email failed: ' .
                 $mailError->getMessage()
             );
-
         }
+
+
+        /*
+        |--------------------------------------------------------------------------
+        | 14. Commit
+        |--------------------------------------------------------------------------
+        */
 
         DB::commit();
 
+
+        /*
+        |--------------------------------------------------------------------------
+        | 15. Response
+        |--------------------------------------------------------------------------
+        */
+
         return response()->json([
+
             'success' => true,
-            'message' => 'Registration submitted successfully. Your membership is waiting for administrator approval.',
-            'license_number' => $licenseNumber,
-            'image' => $imagePath
-        ]);
+
+            'message' =>
+                'Registration submitted successfully. ' .
+                'Your membership is waiting for administrator approval.',
+
+            'license_number' =>
+                $licenseNumber,
+
+            'image' =>
+                $imagePath,
+
+            'is_international' =>
+                $isInternational,
+
+        ], 201);
+
 
     } catch (\Exception $e) {
 
+        /*
+        |--------------------------------------------------------------------------
+        | Rollback database transaction
+        |--------------------------------------------------------------------------
+        */
+
         DB::rollBack();
 
+        \Log::error(
+            'Pilot registration failed',
+            [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'email' => $request->email ?? null,
+            ]
+        );
+
         return response()->json([
+
             'success' => false,
-            'message' => $e->getMessage()
+
+            'message' =>
+                'Unable to complete registration. Please try again.',
+
+            'error' =>
+                config('app.debug')
+                    ? $e->getMessage()
+                    : null,
+
         ], 500);
     }
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\BoardMemberController;
 use App\Http\Controllers\Admin\ContactMessageController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -439,10 +440,6 @@ Route::middleware([
             'index',
         ]);
 
-Route::get('pilots/{pilot}/avatar', [
-    AdminPilotController::class,
-    'avatar',
-]);
         Route::get(
             'pilots/{pilot}/licenses',
             [
@@ -451,7 +448,6 @@ Route::get('pilots/{pilot}/avatar', [
             ]
         );
 
-
         Route::get(
             'pilots/{pilot}/licenses/{index}',
             [
@@ -459,24 +455,7 @@ Route::get('pilots/{pilot}/avatar', [
                 'downloadLicense',
             ]
         );
-
-
-        /*
-        |--------------------------------------------------------------------------
-        | Keep dynamic pilot route LAST.
-        |--------------------------------------------------------------------------
-        */
-
-        Route::get('pilots/{pilot}', [
-            AdminPilotController::class,
-            'show',
-        ]);
-                Route::get('sports', [
-            AdminSportController::class,
-            'index',
-        ]);
     });
-
 
 /*
 |--------------------------------------------------------------------------
@@ -682,6 +661,11 @@ Route::patch('/feedback/{feedback}', [
             'update',
         ]);
 
+Route::get('sports', [
+    AdminSportController::class,
+    'index',
+]);
+
 
 Route::post('sports', [
     AdminSportController::class,
@@ -762,6 +746,43 @@ Route::delete('sports/{sport}', [
             Route::get('/contact-messages', [ContactMessageController::class, 'index']);
     Route::get('/contact-messages/{contactMessage}', [ContactMessageController::class, 'show']);
     Route::delete('/contact-messages/{contactMessage}', [ContactMessageController::class, 'destroy']);
+
+
+// LASF BOARD
+
+Route::get(
+    'board-members',
+    [BoardMemberController::class, 'index']
+);
+
+Route::post(
+    'board-members',
+    [BoardMemberController::class, 'store']
+);
+
+Route::get(
+    'board-members/{boardMember}',
+    [BoardMemberController::class, 'show']
+);
+
+Route::put(
+    'board-members/{boardMember}',
+    [BoardMemberController::class, 'update']
+);
+
+Route::patch(
+    'board-members/{boardMember}',
+    [BoardMemberController::class, 'update']
+);
+
+Route::delete(
+    'board-members/{boardMember}',
+    [BoardMemberController::class, 'destroy']
+);Route::get('board-members', [BoardMemberController::class, 'index']);
+Route::post('board-members', [BoardMemberController::class, 'store']);
+Route::get('board-members/{boardMember}', [BoardMemberController::class, 'show']);
+Route::post('board-members/{boardMember}', [BoardMemberController::class, 'update']);
+Route::delete('board-members/{boardMember}', [BoardMemberController::class, 'destroy']);
 
         Route::apiResource(
             'destinations',
