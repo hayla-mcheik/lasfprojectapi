@@ -17,12 +17,15 @@ return [
         '*',
     ],
 
-    'allowed_origins' => [
-        'https://lasf.info',
-        'https://www.lasf.info',
-        'https://localhost',
-        'http://localhost:3000',
-    ],
+
+'allowed_origins' => [
+    'https://lasf.info',
+    'https://www.lasf.info',
+    'https://localhost',
+    'http://localhost:3000',
+    'capacitor://localhost',
+],
+
 
     'allowed_origins_patterns' => [],
 
