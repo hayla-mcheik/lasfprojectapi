@@ -628,6 +628,11 @@ Route::middleware([
             'destroy',
         ]);
 
+Route::get('pilots/{pilot}/visitor-card', [
+    AdminPilotController::class,
+    'visitorCard',
+]);
+
 Route::get('/feedback', [
     AdminFeedbackController::class,
     'index',
