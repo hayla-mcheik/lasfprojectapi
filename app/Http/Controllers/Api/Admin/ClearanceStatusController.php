@@ -172,14 +172,11 @@ public function store(Request $request)
         |--------------------------------------------------------------------------
         */
 
- if ($user->isArmy()) {
-
-    if (!in_array($data['status'], ['green', 'red'], true)) {
-
+if ($user->isArmy()) {
+    if (!in_array($data['status'], ['green', 'yellow', 'red'], true)) {
         return response()->json([
             'success' => false,
-            'message' =>
-                'Army can only change the status to OPEN or CLOSED.'
+            'message' => 'Invalid airspace status.'
         ], 403);
     }
 }
@@ -360,13 +357,10 @@ public function update(
 */
 
 if ($user->isArmy()) {
-
-    if (!in_array($newStatus, ['green', 'red'], true)) {
-
+    if (!in_array($newStatus, ['green', 'yellow', 'red'], true)) {
         return response()->json([
             'success' => false,
-            'message' =>
-                'Army can only change the status to OPEN or CLOSED.'
+            'message' => 'Invalid airspace status.'
         ], 403);
     }
 }
