@@ -440,21 +440,29 @@ Route::middleware([
             'index',
         ]);
 
-        Route::get(
-            'pilots/{pilot}/licenses',
-            [
-                AdminPilotController::class,
-                'licenses',
-            ]
-        );
+        Route::get('pilots/{pilot}/licenses', [
+            AdminPilotController::class,
+            'licenses',
+        ]);
 
-        Route::get(
-            'pilots/{pilot}/licenses/{index}',
-            [
-                AdminPilotController::class,
-                'downloadLicense',
-            ]
-        );
+        Route::get('pilots/{pilot}/licenses/{index}', [
+            AdminPilotController::class,
+            'downloadLicense',
+        ]);
+        Route::get('pilots/{pilot}/avatar', [
+    AdminPilotController::class,
+    'avatar',
+]);
+Route::get('pilots/{pilot}/visitor-card', [
+    AdminPilotController::class,
+    'visitorCard',
+]);
+
+        // Allow authorized pilot-viewing roles to load sports
+        Route::get('sports', [
+            AdminSportController::class,
+            'index',
+        ]);
     });
 
 /*
@@ -628,10 +636,7 @@ Route::middleware([
             'destroy',
         ]);
 
-Route::get('pilots/{pilot}/visitor-card', [
-    AdminPilotController::class,
-    'visitorCard',
-]);
+
 
 Route::get('/feedback', [
     AdminFeedbackController::class,
@@ -666,10 +671,7 @@ Route::patch('/feedback/{feedback}', [
             'update',
         ]);
 
-Route::get('sports', [
-    AdminSportController::class,
-    'index',
-]);
+
 
 
 Route::post('sports', [
